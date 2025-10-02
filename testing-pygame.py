@@ -12,7 +12,7 @@ clock = pygame.time.Clock()
 
 
 
-
+print("hello")
 
 
 
