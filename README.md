@@ -1,4 +1,4 @@
-﻿# Karetní roguelike hra v Pythonu pomocí Pygame
+﻿# Karetní roguelike hra
  **Smashing Time**
 
 
@@ -30,3 +30,4 @@
 > - 3 měsíc - Vytvoření uživatelského rozhraní
 > - 4 měsíc - Integrování ilustrací
 > - 5 měsíc - Dokončení projektu.
+
