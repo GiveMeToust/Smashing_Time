@@ -1,4 +1,4 @@
-from random import random
+import random
 from tkinter import font
 import pygame
 import sys
@@ -12,7 +12,7 @@ clock = pygame.time.Clock()
 
 
 
-print("hello")
+
 
 
 
@@ -52,15 +52,6 @@ Joe_pool = [
 
 
 
-
-class move:
-    def __init__(self, name, power, type):
-        self.name = name
-        self.power = power
-        self.type = type
-
-    def __repr__(self):
-        return f"{self.name} (Power: {self.power}, Type: {self.type})"
     
 
 
@@ -92,13 +83,13 @@ class champion:
             damage_resolved = 0
         
         if self.pending_block > self.pending_damage:
-            self.pending_block = self.pending_damage #So that it would only show how much damage was actually blocked
+            self.pending_block = self.pending_damage #So that it would ONLY show how much damage was actually blocked
 
         self.HP -= damage_resolved
         self.pending_damage = 0
         if self.HP <= 0:
-            self.alive = False
-            print(f"{self.name} has been defeated!")
+            self.alive = False  
+            print(f"{self.name} has been defeated!") 
 
         print(f"{self.name} has received {damage_resolved} damage! ({self.pending_block} blocked)")
 
@@ -163,8 +154,21 @@ class player(champion):
     def __repr__(self):
         return f"{self.name} (maxHP: {self.maxHP}, HP: {self.HP}, STR: {self.STR}, DEF: {self.DEF}, Energy: {self.Energy}, pool: {self.poolname})"
 
-    def draw(self, player_pool, drawNum):
-       return random.choices(player_pool, k=drawNum)
+    def make_hand(self,):
+       return random.choices(self.pool, k=self.drawNum) 
+    
+    def resolve_move(self, smash):
+
+
+        if move.type == "attack": 
+            Enemy.pending_damage += move.power + self.STR
+        elif move.type == "defend":
+            self.pending_block += move.power + self.DEF
+        elif move.type == "STR-up":
+            self.STR += move.power
+        elif move.type == "DEF-up":
+            self.DEF += move.power  
+            
 
 
 
@@ -188,7 +192,7 @@ class enemy(champion):
 
     def make_enemy_move(self):
         enemy_move = random.choice(self.pool)
-        if enemy_move.type == "attack":
+        if enemy_move.type == "attack": 
             Player.pending_damage += enemy_move.power + self.STR
         elif enemy_move.type == "defend":
             self.pending_block += enemy_move.power + self.DEF
@@ -222,19 +226,42 @@ def draw_button(screen, button_rect, text):     #button function
     screen.blit(text_surface, (button_rect.x + 10, button_rect.y + 10))   
 
 
+def draw_hand(screen, hand, start_x, start_y, card_width, card_height, spacing):
+    for i, card in enumerate(hand):
+        card_rect = pygame.Rect(start_x + i * (card_width + spacing), start_y, card_width, card_height)
+        pygame.draw.rect(screen, (255, 255, 255), card_rect)  # White card background
+        font = pygame.font.SysFont(None, 24)
+        text_surface = font.render(card.name, True, (0, 0, 0))  # Black text
+        text_rect = text_surface.get_rect(center=card_rect.center)
+        screen.blit(text_surface, text_rect)
+
+
+
+
+
+
+
+
+
+
 # Define your squares: x, y, width, height
 player_square = pygame.Rect(0, 100, 430, 50)
 enemy_square = pygame.Rect(650, 100, 330, 50)
 player_attack_square = pygame.Rect(0, 200, 430, 50)
 enemy_attack_square = pygame.Rect(650, 200, 330, 50)
 resolve_square = pygame.Rect(300, 300, 200, 50)
+draw_square = pygame.Rect(300, 400, 200, 50)
+
+
+hand = Player.make_hand()
 
 
 
-
-
-
-
+hand_start_x = 50
+hand_start_y = 450
+hand_card_width = 100
+hand_card_height = 150 
+hand_spacing = 10
 
 
 
@@ -246,6 +273,9 @@ while True:
     draw_button(screen, player_attack_square, "Player Attack") 
     draw_button(screen, enemy_attack_square, "Enemy Attack")
     draw_button(screen, resolve_square, "Resolve Damage")
+    draw_button(screen, draw_square, "Draw")
+    draw_hand(screen, hand, hand_start_x, hand_start_y, hand_card_width, hand_card_height, hand_spacing)
+
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:  
@@ -253,21 +283,43 @@ while True:
             sys.exit()
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if player_attack_square.collidepoint(event.pos):
+                print()
                 print("Player Attack button clicked!")
                 Enemy.pending_damage += 10  # Example action
                 print(f"Enemy.pending_damage: {Enemy.pending_damage}")
+
             elif enemy_attack_square.collidepoint(event.pos):
+                print()
                 print("Enemy Attack button clicked!")
                 Player.pending_damage += 10  # Example action
                 print(f"Player.pending_damage: {Player.pending_damage}")
+
             elif resolve_square.collidepoint(event.pos):
+                print()
                 print("Resolve Damage button clicked!")
                 Player.take_damage()
                 Enemy.take_damage()
 
+            elif draw_square.collidepoint(event.pos):
+                print()
+                print("Draw button clicked!")
+                hand = Player.make_hand()
+                print(f"New hand: {hand}")
+            
+            for i, card in enumerate(hand):
+                card_rect = pygame.Rect(hand_start_x + i * (hand_card_width + hand_spacing), hand_start_y, hand_card_width, hand_card_height)
+                if card_rect.collidepoint(event.pos):
+                    print()
+                    print(f"Card {card.name} clicked!")
+                    Player.resolve_move(card)
+                    hand.remove(card)  # Remove the played card from hand
+                    print(f"Played {card}. New hand: {hand}")
+                    print(f"Enemy pending_damage: {Enemy.pending_damage}, Player pending_block: {Player.pending_block}")
+                    break  # Exit loop after playing one card
 
 
-        
+
+
 
     pygame.display.flip()
     clock.tick(60)
