@@ -11,6 +11,11 @@ pygame.display.set_caption("Pygame Test")
 clock = pygame.time.Clock()
 
 
+hand = []
+turn_count =  1
+
+print("hello world 2")
+
 
 
 
@@ -103,41 +108,7 @@ class champion:
 
 
 
-    # def TakeDamage (self):
-    #     demage_resolved =  self.pending_damage - self.pending_block
-    #     if demage_resolved < 0:
-    #         demage_resolved = 0
-        
-    #     if self.pending_block > self.pending_damage:
-    #         self.pending_block = self.pending_damage #So that it would only show how much demage was actually blocked
 
-    #     self.HP -= demage_resolved 
-    #     print(f"{self.name} has taken {self.pending_damage} demage! ({self.pending_block} blocked)")
-    #     self.pending_damage = 0
-    #     self.pending_block = 0
-
-    #     if self.HP <= 0:
-    #         self.alive = False
-    #         print(f" {self.name} has been defeated!")
-
-    #     if self.HP > self.maxHP:
-    #         self.HP = self.maxHP
-        
-    # def PendMove (self, move):
-    #     if move.type == "attack":
-    #         if self.name == "player":
-    #                  Joe.pending_damage += move.power + self.STR
-    #         else:
-    #                 player.pending_damage += move.power + self.STR
-
-    #     elif move.type == "defend":
-    #         self.pending_block += move.power + self.DEF
-        
-    #     elif move.type == "STR-up":
-    #         self.STR += move.power
-        
-    #     elif move.type == "DEF-up":
-    #         self.DEF += move.power
 
 
 
@@ -145,6 +116,8 @@ class champion:
 
 
 class player(champion):
+    global Enemy
+
     def __init__(self, name, maxHP, STR, DEF, pool, poolname, MaxEnergy, drawNum):
         super().__init__(name, maxHP, STR, DEF, pool, poolname)
         self.MaxEnergy = MaxEnergy
@@ -152,13 +125,12 @@ class player(champion):
         self.drawNum = drawNum
 
     def __repr__(self):
-        return f"{self.name} (maxHP: {self.maxHP}, HP: {self.HP}, STR: {self.STR}, DEF: {self.DEF}, Energy: {self.Energy}, pool: {self.poolname})"
+        return f"{self.name} (HP: {self.HP}/{self.maxHP}, STR: {self.STR}, DEF: {self.DEF}, Energy: {self.Energy}, P.DMG: {self.pending_damage}, P.BLOCK: {self.pending_block}, pool: {self.poolname})"
 
     def make_hand(self,):
        return random.choices(self.pool, k=self.drawNum) 
     
-    def resolve_move(self, smash):
-
+    def resolve_move(self, move):
 
         if move.type == "attack": 
             Enemy.pending_damage += move.power + self.STR
@@ -188,7 +160,7 @@ class enemy(champion):
         super().__init__(name, maxHP, STR, DEF, pool, poolname)  
 
     def __repr__(self):
-        return f"{self.name} (maxHP: {self.maxHP}, HP: {self.HP}, STR: {self.STR}, DEF: {self.DEF}, pool: {self.poolname})"
+        return f"{self.name} (maxHP: {self.maxHP}, HP: {self.HP}, STR: {self.STR}, DEF: {self.DEF}, pool: {self.poolname}, P.DMG: {self.pending_damage}, P.BLOCK: {self.pending_block})"
 
     def make_enemy_move(self):
         enemy_move = random.choice(self.pool)
@@ -218,7 +190,7 @@ class gameloop:
 
     def __repr__(self):
         return f"Game Loop (Player: {self.Player}, Enemy: {self.enemy})"
-
+    
 def draw_button(screen, button_rect, text):     #button function
     pygame.draw.rect(screen, (0, 128, 255), button_rect)  # color: blue
     font = pygame.font.SysFont(None, 18)    #default font, size 18
@@ -236,21 +208,45 @@ def draw_hand(screen, hand, start_x, start_y, card_width, card_height, spacing):
         screen.blit(text_surface, text_rect)
 
 
+def end_turn():
+    global turn_count
+    global hand
+    global Player
+    global Enemy
+
+    print()
+    print(f"New turn, {turn_count}")
+    turn_count += 1
+
+    Player.take_damage()
+    Enemy.take_damage()
+
+    Enemy.make_enemy_move()
+    Player.Energy = Player.MaxEnergy
+
+
+    hand = Player.make_hand()
+
+    print(f"New hand: {hand}")
+    print()
+
+    
 
 
 
-
+    
 
 
 
 
 # Define your squares: x, y, width, height
 player_square = pygame.Rect(0, 100, 430, 50)
-enemy_square = pygame.Rect(650, 100, 330, 50)
+enemy_square = pygame.Rect(550, 100, 330, 50)
 player_attack_square = pygame.Rect(0, 200, 430, 50)
-enemy_attack_square = pygame.Rect(650, 200, 330, 50)
+enemy_attack_square = pygame.Rect(550, 200, 330, 50)
 resolve_square = pygame.Rect(300, 300, 200, 50)
-draw_square = pygame.Rect(300, 400, 200, 50)
+end_turn_square = pygame.Rect(300, 400, 200, 50)
+
 
 
 hand = Player.make_hand()
@@ -273,7 +269,7 @@ while True:
     draw_button(screen, player_attack_square, "Player Attack") 
     draw_button(screen, enemy_attack_square, "Enemy Attack")
     draw_button(screen, resolve_square, "Resolve Damage")
-    draw_button(screen, draw_square, "Draw")
+    draw_button(screen, end_turn_square, "End Turn")
     draw_hand(screen, hand, hand_start_x, hand_start_y, hand_card_width, hand_card_height, hand_spacing)
 
 
@@ -300,11 +296,11 @@ while True:
                 Player.take_damage()
                 Enemy.take_damage()
 
-            elif draw_square.collidepoint(event.pos):
+            elif end_turn_square.collidepoint(event.pos):
                 print()
-                print("Draw button clicked!")
-                hand = Player.make_hand()
-                print(f"New hand: {hand}")
+                print("End Turn button clicked!")
+                end_turn()
+
             
             for i, card in enumerate(hand):
                 card_rect = pygame.Rect(hand_start_x + i * (hand_card_width + hand_spacing), hand_start_y, hand_card_width, hand_card_height)
