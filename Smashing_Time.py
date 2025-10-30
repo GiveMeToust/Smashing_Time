@@ -4,6 +4,8 @@ import copy
 import pygame
 import sys
 
+
+
 pygame.init()
 
 screen = pygame.display.set_mode((1000, 800))
@@ -240,7 +242,6 @@ floor1 = [Joe, construct]
 
 
 
-
 class gameloop:
     def __init__(self, Player, enemy):
         self.Player = Player
@@ -256,7 +257,12 @@ class gameloop:
         screen.blit(text_surface, (button_rect.x + 10, button_rect.y + 10))
 
 
-    def draw_hand(self,screen, hand, start_x, start_y, card_width, card_height, spacing):
+    def draw_hand(self,screen, hand, start_x, start_y, end_x,  card_width, card_height):
+
+        L = end_x - start_x
+        
+        spacing = (L - len(hand)*card_width) / (len(hand) + 1)
+
         for i, card in enumerate(hand):
             card_rect = pygame.Rect(start_x + i * (card_width + spacing), start_y, card_width, card_height)
             pygame.draw.rect(screen, (255, 255, 255), card_rect)  # White card background
@@ -327,7 +333,8 @@ hand_start_x = 50
 hand_start_y = 450
 hand_card_width = 100
 hand_card_height = 150 
-hand_spacing = 10
+end_x= 600
+
 
 
 
@@ -341,8 +348,8 @@ while True:
     game.draw_button(screen, enemy_attack_square, "Enemy Attack")
     game.draw_button(screen, resolve_square, "Resolve Damage")
     game.draw_button(screen, end_turn_square, "End Turn")
-    game.draw_hand(screen, hand, hand_start_x, hand_start_y, hand_card_width, hand_card_height, hand_spacing)
-    game.draw_button(screen, enemy_intent, f"Enemy Intent: {Enemy.enemy_move.name if hasattr(Enemy, 'enemy_move') else 'None'}")
+    game.draw_hand(screen, hand, hand_start_x, hand_start_y, end_x, hand_card_width, hand_card_height)
+    game.draw_button(screen, enemy_intent, f"Enemy Intent: {Enemy.enemy_move if hasattr(Enemy, 'enemy_move') else 'None'}")
     game.draw_button(screen, turn_count_square, f"Turn: {turn_count}")
 
 
@@ -375,7 +382,7 @@ while True:
 
             
             for i, card in enumerate(hand):
-                card_rect = pygame.Rect(hand_start_x + i * (hand_card_width + hand_spacing), hand_start_y, hand_card_width, hand_card_height)
+                card_rect = pygame.Rect(hand_start_x + i * (hand_card_width), hand_start_y, hand_card_width, hand_card_height)
                 if card_rect.collidepoint(event.pos):
                     print()
                     print(f"Card {card.name} clicked!")
@@ -390,4 +397,3 @@ while True:
 
     pygame.display.flip()
     clock.tick(60)
-
