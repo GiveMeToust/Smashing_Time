@@ -4,7 +4,7 @@
 
 
 
-Mím hlavním cílem je vytvořit v 2D karetní bojovou hru Pythonu s použitím knihovný Pygame kde bude hráč takticky hrát karty kterýmy bude interagovat s prostředím a nepřáteli (dávat damage, přidávat status effecty, atd). Hra bude kombinovat standartní prvky karetních her a roguelite her (vysoká znovuhratelnost, se smrtí hra končí a musí se zahrát od znova, velké množství náhodných prvků).
+Mým hlavním cílem je vytvořit v 2D karetní bojovou hru Pythonu s použitím knihovný Pygame kde bude hráč takticky hrát karty kterýmy bude interagovat s prostředím a nepřáteli (dávat damage, přidávat status effecty, atd). Hra bude kombinovat standartní prvky karetních her a roguelite her (vysoká znovuhratelnost, se smrtí hra končí a musí se zahrát od znova, velké množství náhodných prvků).
 
 
 **Rosah projektu:**
@@ -33,5 +33,6 @@ Mím hlavním cílem je vytvořit v 2D karetní bojovou hru Pythonu s použitím
 > - 5 měsíc - Dokončení projektu.
 >
 >     Do 1.3. poslední úpravy, doladění projektu a uvedení do finálního stavu.
+
 
 
