@@ -18,21 +18,8 @@ Mým hlavním cílem je vytvořit v 2D karetní bojovou hru Pythonu s použitím
 
 
 **Časový plán:**
-> - 1 měsíc - Vytvoření kostry hry (procesy v pozadí)
+>Do první kontroly (mezi 24.11. a 12.12.):
+>  Uvést hru do stavu ve kterém je technicky hratelná. Tedy by měla mít implementované většinu karet, nepřátel, a klíčových mechanik.
 >
->     Do 1.11. 2025 hra obsahuje základní prvky nutné  k funkci hry
-> - 2 měsíc - Uvedení hry fo hratelného stavu
->   
->     Do 1.12. 2025 hra má většinu finálních prvků hratelnosti
-> - 3 měsíc - Vytvoření uživatelského rozhraní
->
->     Do 1.1. 2026 Vytvoření funkční uživatelského rozhraní
-> - 4 měsíc - Integrování ilustrací
->   
->     Do 1.2. Integrace originálních ilustrací do uživatelského rozhraní
-> - 5 měsíc - Dokončení projektu.
->
->     Do 1.3. poslední úpravy, doladění projektu a uvedení do finálního stavu.
-
-
-
+>Do druhé kontroly (mezi 26.1. a 6.2.):
+>  Mít plně hratelnou hru s roguelite mechanikama implementováními a s funkčním uživatelským rozhraním.
