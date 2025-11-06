@@ -105,13 +105,22 @@ class player(champion):
        return random.sample(self.pool, k=self.drawNum) 
     
     def resolve_move(self, move):
+        global hand
+        global Enemy
 
         if self.Energy < 1:
             print("Not enough energy to play this move!")
             return 
         self.Energy -= 1
-        
-          # Remove the played card from hand
+
+        # Find the move in the hand by reference or attributes
+        for card in hand:
+            if card == move:
+                hand.remove(card)
+                break
+        else:
+            print("Error: Attempted to play a move not in hand.")
+            return
 
         if move.type == "attack":
             if Enemy.alive == False:
@@ -153,7 +162,6 @@ class player(champion):
                 print(f"Applying 'enrage' effect! DEF before: {self.DEF}, reducing by {x}")
                 self.DEF -= x
 
-
         if Enemy.HP <= 0:
             Enemy.alive = False
         if Enemy.alive == False:
@@ -161,10 +169,6 @@ class player(champion):
             game.assign_new_enemy()
             game.end_turn()
         
-
-
-        hand.remove(move)
-
 
 
 
@@ -338,6 +342,8 @@ class gameloop:
 
     def make_choice_new_card(self):
         global current_choices
+        global game_state
+        global event
 
         for i, card in enumerate(current_choices):
             pygame.draw.rect(screen, (255, 255, 255), (200 + i * 200, 300, 150, 50))
@@ -346,16 +352,16 @@ class gameloop:
             text_rect = text_surface.get_rect(center=(200 + i * 200 + 75, 300 + 25))
             screen.blit(text_surface, text_rect)
 
-        for event in pygame.event.get():
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                for i in range(len(current_choices)):
-                    choice_rect = pygame.Rect(200 + i * 200, 300, 150, 50)
-                    if choice_rect.collidepoint(event.pos):
-                        chosen_card = current_choices[i]
-                        Player.pool.append(chosen_card)
-                        print(f"You chose {chosen_card.name} to add to your pool!")
-                        game_state = "fight"
-                        return
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            for i in range(len(current_choices)):
+                choice_rect = pygame.Rect(200 + i * 200, 300, 150, 50)
+                if choice_rect.collidepoint(event.pos):
+                    chosen_card = current_choices[i]
+                    Player.pool.append(chosen_card)
+                    print(f"You chose {chosen_card.name} to add to your pool!")
+                    game_state = "fight"
+                    return
 
     def start_game(self):
         None
@@ -412,8 +418,7 @@ while True:
         game.draw_button(screen, turn_count_square, f"Turn: {turn_count}")
         game.draw_button(screen, choose_new_card_square, "Choose New Card")
 
-    if game_state == "choose_new_card":
-        game.make_choice_new_card()
+
         
 
 
@@ -424,7 +429,10 @@ while True:
             pygame.quit()
             sys.exit()
 
-        if game_state == "fight":
+        if game_state == "choose_new_card":
+            game.make_choice_new_card()
+
+        elif game_state == "fight":
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if player_attack_square.collidepoint(event.pos):
                     print()
