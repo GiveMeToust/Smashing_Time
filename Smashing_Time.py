@@ -16,9 +16,9 @@ clock = pygame.time.Clock()
 
 hand = []
 turn_count =  1
+game_state = "fight"
 
-print("hello world 5")
-
+print("hello world")
 
 
 
@@ -26,41 +26,42 @@ print("hello world 5")
 
 
 class move:
-    def __init__(self, name, power, type, cost):
+    def __init__(self, name, power, type, cost, tags):
         self.name = name
         self.power = power
         self.type = type
         self.cost = cost
+        self.tags = tags
 
     def __repr__(self):
-        return f"{self.name} (type: {self.type}, power: {self.power}, cost: {self.cost})"
+        return f"{self.name} (type: {self.type}, power: {self.power}, cost: {self.cost}, tags: {self.tags})"
 
 
 Kori_pool = [
-    move("Smash", 10, "attack", 1),
-    move("Smash", 10, "attack", 1),
-    move("Smash", 10, "attack", 1),
-    move("Defend", 10, "defend", 1),
-    move("Defend", 10, "defend", 1),
-    move("Defend", 10, "defend", 1),
-    move("SMASH!", 25, "attack", 2),
-    move("Enrage", 5, "STR-up", 1),
-    move("Concentrate", 5, "DEF-up", 1)
+    move("Smash", 10, "attack", 1, tags=[None]),
+    move("Smash", 10, "attack", 1, tags=[None]),
+    move("Smash", 10, "attack", 1, tags=[None]),
+    move("Defend", 10, "defend", 1, tags=[None]),
+    move("Defend", 10, "defend", 1, tags=[None]),
+    move("Defend", 10, "defend", 1, tags=[None]),
+    move("SMASH!", 25, "attack", 2, tags=[None]),
+    move("Enrage", 5, "STR-up", 1, tags=["enrage"]),
+    move("Concentrate", 5, "DEF-up", 1, tags=[None])
 ]
 
 
 Joe_pool = [
-    move("punch", 15, "attack", 999),
-    move("punch", 15, "attack", 999),
-    move("cower", 20, "defend", 999),
-    move("cower", 20, "defend", 999),
-    move("Calm breath", 5, "DEF-up", 999)
+    move("punch", 15, "attack", 999,  tags=[None]),
+    move("punch", 15, "attack", 999,  tags=[None]),
+    move("cower", 20, "defend", 999,  tags=[None]),
+    move("cower", 20, "defend", 999,  tags=[None]),
+    move("Calm breath", 5, "DEF-up", 999,  tags=[None])
 ]
 
 Construct_pool = [
-    move("slam", 30, "attack", 999),
-    move("fortify", 30, "defend", 999),
-    move("construct", 10, "STR-up", 999),
+    move("slam", 30, "attack", 999,  tags=[None]),
+    move("fortify", 30, "defend", 999,  tags=[None]),
+    move("construct", 10, "STR-up", 999,  tags=[None])
 ]
 
 
@@ -101,7 +102,7 @@ class player(champion):
         return f"{self.name} (HP: {self.HP}/{self.maxHP}, STR: {self.STR}, DEF: {self.DEF}, Energy: {self.Energy}, P.DMG: {self.pending_damage}, Block: {self.block}, pool: {self.poolname})"
 
     def make_hand(self,):
-       return random.choices(self.pool, k=self.drawNum) 
+       return random.sample(self.pool, k=self.drawNum) 
     
     def resolve_move(self, move):
 
@@ -110,7 +111,7 @@ class player(champion):
             return 
         self.Energy -= 1
         
-        hand.remove(card)  # Remove the played card from hand
+          # Remove the played card from hand
 
         if move.type == "attack":
             if Enemy.alive == False:
@@ -142,15 +143,31 @@ class player(champion):
         elif move.type == "DEF-up":
             self.DEF += move.power 
         else:
-            print("What the fuck kind of move is that? What is happening?! I am going insane!")
+            print("What the fuck kind of move is that? What is happening?! I am going insane! AAARRRGH!!!")
             return
-        
+
+        for tag in move.tags:
+            if tag == "enrage":
+                x = move.power / 2
+                x = round(x)
+                print(f"Applying 'enrage' effect! DEF before: {self.DEF}, reducing by {x}")
+                self.DEF -= x
+
+
         if Enemy.HP <= 0:
             Enemy.alive = False
         if Enemy.alive == False:
             print(f"{Enemy.name} has been defeated!")
             game.assign_new_enemy()
             game.end_turn()
+        
+
+
+        hand.remove(move)
+
+
+
+
 
     def take_damage(self):
         if not self.alive:
@@ -232,11 +249,13 @@ Joe=enemy("Joe", 50, 0, 0, Joe_pool, "Joe pool")
 construct = enemy("Construct", 100, 0, 0, Construct_pool, "Construct pool")
 Enemy = copy.deepcopy(Joe)
 
-floor1 = [Joe, construct]
-
-
-
-
+floor1_enemies = [Joe, construct]
+floor1_loot = [
+    move("Smash", 10, "attack", 1, tags=[None]),
+    move("Block", 5, "defend", 1, tags=[None]),
+    move("Power Up", 5, "STR-up", 1, tags=[None]),
+    move("Defense Up", 5, "DEF-up", 1, tags=[None]),
+]
 
 
 
@@ -269,14 +288,14 @@ class gameloop:
             font = pygame.font.SysFont(None, 24)
             text_surface = font.render(card.name, True, (0, 0, 0))  # Black text
             text_rect = text_surface.get_rect(center=card_rect.center)
-            screen.blit(text_surface, text_rect)
+            screen.blit(text_surface, text_rect) # Draw card name centered on the card
 
 
     def assign_new_enemy(self):
         global Enemy
         if Enemy.alive == False:
             print(f"{Enemy.name} has been defeated! A new enemy approaches!")
-            Enemy = copy.deepcopy(random.choice(floor1))
+            Enemy = copy.deepcopy(random.choice(floor1_enemies))
             print(f"A wild {Enemy.name} appears!")
 
 
@@ -304,6 +323,43 @@ class gameloop:
         print(f"New hand: {hand}")
         print()
 
+    def start_new_card_selection(self):
+        global floor1_loot
+        global game_state
+        global current_choices
+
+        game_state = "choose_new_card"
+
+        current_choices = random.sample(floor1_loot, 3)
+
+        print("Choose a new card to add to your pool:")
+        for i, card in enumerate(current_choices):
+            print(f"{i + 1}: {card.name}")
+
+    def make_choice_new_card(self):
+        global current_choices
+
+        for i, card in enumerate(current_choices):
+            pygame.draw.rect(screen, (255, 255, 255), (200 + i * 200, 300, 150, 50))
+            font = pygame.font.SysFont(None, 24)
+            text_surface = font.render(card.name, True, (0, 0, 0))
+            text_rect = text_surface.get_rect(center=(200 + i * 200 + 75, 300 + 25))
+            screen.blit(text_surface, text_rect)
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for i in range(len(current_choices)):
+                    choice_rect = pygame.Rect(200 + i * 200, 300, 150, 50)
+                    if choice_rect.collidepoint(event.pos):
+                        chosen_card = current_choices[i]
+                        Player.pool.append(chosen_card)
+                        print(f"You chose {chosen_card.name} to add to your pool!")
+                        game_state = "fight"
+                        return
+
+    def start_game(self):
+        None
+
     
 game = gameloop(Player, Enemy)
 
@@ -315,13 +371,14 @@ game = gameloop(Player, Enemy)
 
 # Define your squares: x, y, width, height
 player_square = pygame.Rect(0, 100, 430, 50)
-enemy_square = pygame.Rect(550, 100, 330, 50)
+enemy_square = pygame.Rect(650, 100, 330, 50)
 player_attack_square = pygame.Rect(0, 200, 430, 50)
-enemy_attack_square = pygame.Rect(550, 200, 330, 50)
-resolve_square = pygame.Rect(300, 300, 200, 50)
-end_turn_square = pygame.Rect(300, 400, 200, 50)
-enemy_intent = pygame.Rect(550, 300, 330, 50)
+enemy_attack_square = pygame.Rect(650, 200, 330, 50)
+resolve_square = pygame.Rect(400, 300, 200, 50)
+end_turn_square = pygame.Rect(400, 400, 200, 50)
+enemy_intent = pygame.Rect(650, 300, 330, 50)
 turn_count_square = pygame.Rect(450, 0, 100, 50)
+choose_new_card_square = pygame.Rect(400, 700, 100, 50)
 
 
 
@@ -329,11 +386,11 @@ hand = Player.make_hand()
 
 
 
-hand_start_x = 50
-hand_start_y = 450
+hand_start_x = 200
+hand_start_y = 500
 hand_card_width = 100
 hand_card_height = 150 
-end_x= 600
+end_x= 800
 
 
 
@@ -342,54 +399,73 @@ enemy_move = Enemy.make_enemy_move()
 
 while True:
     screen.fill((0, 0, 0))
-    game.draw_button(screen, player_square, Player.__repr__())
-    game.draw_button(screen, enemy_square, Enemy.__repr__())
-    game.draw_button(screen, player_attack_square, "Player Attack") 
-    game.draw_button(screen, enemy_attack_square, "Enemy Attack")
-    game.draw_button(screen, resolve_square, "Resolve Damage")
-    game.draw_button(screen, end_turn_square, "End Turn")
-    game.draw_hand(screen, hand, hand_start_x, hand_start_y, end_x, hand_card_width, hand_card_height)
-    game.draw_button(screen, enemy_intent, f"Enemy Intent: {Enemy.enemy_move if hasattr(Enemy, 'enemy_move') else 'None'}")
-    game.draw_button(screen, turn_count_square, f"Turn: {turn_count}")
+
+    if game_state == "fight":
+        game.draw_button(screen, player_square, Player.__repr__())
+        game.draw_button(screen, enemy_square, Enemy.__repr__())
+        game.draw_button(screen, player_attack_square, "Player Attack") 
+        game.draw_button(screen, enemy_attack_square, "Enemy Attack")
+        game.draw_button(screen, resolve_square, "Resolve Damage")
+        game.draw_button(screen, end_turn_square, "End Turn")
+        game.draw_hand(screen, hand, hand_start_x, hand_start_y, end_x, hand_card_width, hand_card_height)
+        game.draw_button(screen, enemy_intent, f"Enemy Intent: {Enemy.enemy_move if hasattr(Enemy, 'enemy_move') else 'None'}")
+        game.draw_button(screen, turn_count_square, f"Turn: {turn_count}")
+        game.draw_button(screen, choose_new_card_square, "Choose New Card")
+
+    if game_state == "choose_new_card":
+        game.make_choice_new_card()
+        
+
+
 
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:  
             pygame.quit()
             sys.exit()
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if player_attack_square.collidepoint(event.pos):
-                print()
-                print("Player Attack button clicked!")
-                Enemy.HP -= 10  # Example action
-                print(f"Enemy.HP: {Enemy.HP}")
 
-            elif enemy_attack_square.collidepoint(event.pos):
-                print()
-                print("Enemy Attack button clicked!")
-                Player.pending_damage += 10  # Example action
-                print(f"Player.pending_damage: {Player.pending_damage}")
-
-            elif resolve_square.collidepoint(event.pos):
-                print()
-                print("Resolve Damage button clicked!")
-                Player.take_damage()
-
-            elif end_turn_square.collidepoint(event.pos):
-                print()
-                print("End Turn button clicked!")
-                game.end_turn()
-
-            
-            for i, card in enumerate(hand):
-                card_rect = pygame.Rect(hand_start_x + i * (hand_card_width), hand_start_y, hand_card_width, hand_card_height)
-                if card_rect.collidepoint(event.pos):
+        if game_state == "fight":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if player_attack_square.collidepoint(event.pos):
                     print()
-                    print(f"Card {card.name} clicked!")
-                    Player.resolve_move(card)
-                    print(f"Played {card}. New hand: {hand}")
-                    print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
-                    break  # Exit loop after playing one card
+                    print("Player Attack button clicked!")
+                    Enemy.HP -= 10  # Example action
+                    print(f"Enemy.HP: {Enemy.HP}")
+
+                elif choose_new_card_square.collidepoint(event.pos):
+                    print()
+                    print("Choose New Card button clicked!")
+                    game.start_new_card_selection()
+
+                elif enemy_attack_square.collidepoint(event.pos):
+                    print()
+                    print("Enemy Attack button clicked!")
+                    Player.pending_damage += 10  # Example action
+                    print(f"Player.pending_damage: {Player.pending_damage}")
+
+                elif resolve_square.collidepoint(event.pos):
+                    print()
+                    print("Resolve Damage button clicked!")
+                    Player.take_damage()
+
+                elif end_turn_square.collidepoint(event.pos):
+                    print()
+                    print("End Turn button clicked!")
+                    game.end_turn()
+
+                
+                for i, card in enumerate(hand):
+                    # Calculate spacing exactly like draw_hand so the clickable rect matches drawn position
+                    spacing = (end_x - hand_start_x - len(hand) * hand_card_width) / (len(hand) + 1) if (len(hand) + 1) > 0 else 0
+                    card_x = hand_start_x + i * (hand_card_width + spacing)
+                    card_rect = pygame.Rect(card_x, hand_start_y, hand_card_width, hand_card_height)
+                    if card_rect.collidepoint(event.pos):
+                        print()
+                        print(f"Card {card.name} clicked!")
+                        Player.resolve_move(card)
+                        print(f"Played {card}. New hand: {hand}")
+                        print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
+                        break  # Exit loop after playing one card
 
 
 
