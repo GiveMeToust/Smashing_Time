@@ -38,34 +38,42 @@ class move:
 
 
 Kori_pool = [
-    move("Smash", 10, "attack", 1, tags=[None]),
-    move("Smash", 10, "attack", 1, tags=[None]),
-    move("Smash", 10, "attack", 1, tags=[None]),
-    move("Defend", 10, "defend", 1, tags=[None]),
-    move("Defend", 10, "defend", 1, tags=[None]),
-    move("Defend", 10, "defend", 1, tags=[None]),
-    move("SMASH!", 25, "attack", 2, tags=[None]),
-    move("Enrage", 5, "STR-up", 1, tags=["enrage"]),
-    move("Concentrate", 5, "DEF-up", 1, tags=[None])
+    move("Smash", 10, "attack", 1, tags={}),
+    move("Smash", 10, "attack", 1, tags={}),
+    move("Smash", 10, "attack", 1, tags={}),
+    move("Defend", 10, "defend", 1, tags={}),
+    move("Defend", 10, "defend", 1, tags={}),
+    move("Defend", 10, "defend", 1, tags={}),
+    move("SMASH!", 25, "attack", 2, tags={}),
+    move("Enrage", 5, "STR-up", 1, tags={"enrage": None}),
+    move("Concentrate", 5, "DEF-up", 1, tags={}),
+    move("poison strike", 7, "attack", 1, tags={"poison": 3, "placeholder": 3})
 ]
 
 
 Joe_pool = [
-    move("punch", 15, "attack", 999,  tags=[None]),
-    move("punch", 15, "attack", 999,  tags=[None]),
-    move("cower", 20, "defend", 999,  tags=[None]),
-    move("cower", 20, "defend", 999,  tags=[None]),
-    move("Calm breath", 5, "DEF-up", 999,  tags=[None])
+    move("punch", 15, "attack", 999,  tags={}),
+    move("punch", 15, "attack", 999,  tags={}),
+    move("cower", 20, "defend", 999,  tags={}),
+    move("cower", 20, "defend", 999,  tags={}),
+    move("Calm breath", 5, "DEF-up", 999,  tags={})
 ]
 
 Construct_pool = [
-    move("slam", 30, "attack", 999,  tags=[None]),
-    move("fortify", 30, "defend", 999,  tags=[None]),
-    move("construct", 10, "STR-up", 999,  tags=[None])
+    move("slam", 30, "attack", 999,  tags={}),
+    move("fortify", 30, "defend", 999,  tags={}),
+    move("construct", 10, "STR-up", 999,  tags={})
 ]
 
 
-    
+
+floor1_loot = [
+    move("Smash", 10, "attack", 1, tags={}),
+    move("Block", 4, "defend", 0, tags={}),
+    move("Power Up", 5, "STR-up", 1, tags={}),
+    move("poison strike", 7, "attack", 1, tags={"poison": 3, "placeholder": 3}),
+    move("pray", 5, "defend", 1, tags={"energised":1, }) #I thought about making it heal but that would promote delaying kills, which is not fun
+]
 
 
 
@@ -83,6 +91,7 @@ class champion:
         self.block = 0
         self.pool = pool
         self.poolname = poolname
+        self.status_effects = {}
 
     def __repr__(self):
         return f"{self.name} (maxHP: {self.maxHP}, HP: {self.HP}, STR: {self.STR}, DEF: {self.DEF}, pool: {self.poolname})"
@@ -105,22 +114,16 @@ class player(champion):
        return random.sample(self.pool, k=self.drawNum) 
     
     def resolve_move(self, move):
-        global hand
-        global Enemy
+        global turn_count
+        
+
 
         if self.Energy < 1:
             print("Not enough energy to play this move!")
             return 
         self.Energy -= 1
-
-        # Find the move in the hand by reference or attributes
-        for card in hand:
-            if card == move:
-                hand.remove(card)
-                break
-        else:
-            print("Error: Attempted to play a move not in hand.")
-            return
+        
+          # Remove the played card from hand
 
         if move.type == "attack":
             if Enemy.alive == False:
@@ -154,21 +157,36 @@ class player(champion):
         else:
             print("What the fuck kind of move is that? What is happening?! I am going insane! AAARRRGH!!!")
             return
-
-        for tag in move.tags:
+        global tags
+        for tag, tag_value in move.tags.items():
             if tag == "enrage":
                 x = move.power / 2
                 x = round(x)
                 print(f"Applying 'enrage' effect! DEF before: {self.DEF}, reducing by {x}")
                 self.DEF -= x
+            
+            elif tag == "poison":
+                if "poison" in Enemy.status_effects:
+                    Enemy.status_effects["poison"] += tag_value  # Add to existing poison
+                    print(f"Poison stacked! Total poison damage: {Enemy.status_effects['poison']}")
+                else:
+                    Enemy.status_effects["poison"] = tag_value  # Apply new poison
+                    print(f"Enemy poisoned! Poison damage: {tag_value}")
+            
+            elif tag == "heal":
+                self.HP += tag_value
+                if self.HP > self.maxHP:
+                    self.HP = self.maxHP
+                print(f"{self.name} healed for {tag_value} HP! Current HP: {self.HP}")
 
         if Enemy.HP <= 0:
             Enemy.alive = False
-        if Enemy.alive == False:
-            print(f"{Enemy.name} has been defeated!")
-            game.assign_new_enemy()
-            game.end_turn()
+        game.kill_enemy()
         
+
+
+        hand.remove(move)
+
 
 
 
@@ -222,7 +240,7 @@ Player = copy.deepcopy(Kori)
 
 
 
-class enemy(champion):
+class foe(champion):
     def __init__(self, name, maxHP, STR, DEF, pool, poolname):
         super().__init__(name, maxHP, STR, DEF, pool, poolname)  
     
@@ -249,17 +267,10 @@ class enemy(champion):
 
 
 
-Joe=enemy("Joe", 50, 0, 0, Joe_pool, "Joe pool")
-construct = enemy("Construct", 100, 0, 0, Construct_pool, "Construct pool")
+Joe=foe("Joe", 50, 0, 0, Joe_pool, "Joe pool")
+construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool")
 Enemy = copy.deepcopy(Joe)
-
 floor1_enemies = [Joe, construct]
-floor1_loot = [
-    move("Smash", 10, "attack", 1, tags=[None]),
-    move("Block", 5, "defend", 1, tags=[None]),
-    move("Power Up", 5, "STR-up", 1, tags=[None]),
-    move("Defense Up", 5, "DEF-up", 1, tags=[None]),
-]
 
 
 
@@ -301,7 +312,17 @@ class gameloop:
             print(f"{Enemy.name} has been defeated! A new enemy approaches!")
             Enemy = copy.deepcopy(random.choice(floor1_enemies))
             print(f"A wild {Enemy.name} appears!")
-
+        
+    def kill_enemy(self):
+        global turn_count
+        global Enemy
+        if Enemy.HP <= 0:
+            Enemy.alive = False
+            print(f"{Enemy.name} has been defeated! A new enemy approaches!")
+            game.start_new_card_selection()
+            game.assign_new_enemy()
+            game.end_turn()
+            turn_count = 0
 
     def end_turn(self):
         global turn_count
@@ -315,6 +336,15 @@ class gameloop:
 
         Player.block = 0
         Enemy.block = 0
+
+        if "poison" in Enemy.status_effects:
+            poison_damage = Enemy.status_effects["poison"]
+            Enemy.HP -= poison_damage
+            print(f"{Enemy.name} takes {poison_damage} poison damage!")
+            Enemy.status_effects["poison"] -= 1
+            if Enemy.status_effects["poison"] <= 0:
+                del Enemy.status_effects["poison"]
+            game.kill_enemy()
 
         Player.take_damage() 
 
@@ -342,8 +372,6 @@ class gameloop:
 
     def make_choice_new_card(self):
         global current_choices
-        global game_state
-        global event
 
         for i, card in enumerate(current_choices):
             pygame.draw.rect(screen, (255, 255, 255), (200 + i * 200, 300, 150, 50))
@@ -353,6 +381,8 @@ class gameloop:
             screen.blit(text_surface, text_rect)
 
 
+    def handle_choice_new_card(self):
+        global game_state
         if event.type == pygame.MOUSEBUTTONDOWN:
             for i in range(len(current_choices)):
                 choice_rect = pygame.Rect(200 + i * 200, 300, 150, 50)
@@ -385,11 +415,25 @@ end_turn_square = pygame.Rect(400, 400, 200, 50)
 enemy_intent = pygame.Rect(650, 300, 330, 50)
 turn_count_square = pygame.Rect(450, 0, 100, 50)
 choose_new_card_square = pygame.Rect(400, 700, 100, 50)
+enemy_status_square = pygame.Rect(650, 400, 330, 50)
 
 
 
 hand = Player.make_hand()
 
+
+def basic_draw():
+    game.draw_button(screen, player_square, Player.__repr__())
+    game.draw_button(screen, enemy_square, Enemy.__repr__())
+    game.draw_button(screen, player_attack_square, "Player Attack")    
+    game.draw_button(screen, enemy_attack_square, "Enemy Attack")
+    game.draw_button(screen, resolve_square, "Resolve Damage")
+    game.draw_button(screen, end_turn_square, "End Turn")
+    game.draw_hand(screen, hand, hand_start_x, hand_start_y, end_x, hand_card_width, hand_card_height)
+    game.draw_button(screen, enemy_intent, f"Enemy Intent: {Enemy.enemy_move if hasattr(Enemy, 'enemy_move') else 'None'}")
+    game.draw_button(screen, turn_count_square, f"Turn: {turn_count}")
+    game.draw_button(screen, choose_new_card_square, "Choose New Card")
+    game.draw_button(screen, enemy_status_square, f"Enemy Status: {Enemy.status_effects}")
 
 
 hand_start_x = 200
@@ -407,18 +451,9 @@ while True:
     screen.fill((0, 0, 0))
 
     if game_state == "fight":
-        game.draw_button(screen, player_square, Player.__repr__())
-        game.draw_button(screen, enemy_square, Enemy.__repr__())
-        game.draw_button(screen, player_attack_square, "Player Attack") 
-        game.draw_button(screen, enemy_attack_square, "Enemy Attack")
-        game.draw_button(screen, resolve_square, "Resolve Damage")
-        game.draw_button(screen, end_turn_square, "End Turn")
-        game.draw_hand(screen, hand, hand_start_x, hand_start_y, end_x, hand_card_width, hand_card_height)
-        game.draw_button(screen, enemy_intent, f"Enemy Intent: {Enemy.enemy_move if hasattr(Enemy, 'enemy_move') else 'None'}")
-        game.draw_button(screen, turn_count_square, f"Turn: {turn_count}")
-        game.draw_button(screen, choose_new_card_square, "Choose New Card")
-
-
+        basic_draw()
+    if game_state == "choose_new_card":
+        game.make_choice_new_card()
         
 
 
@@ -429,10 +464,7 @@ while True:
             pygame.quit()
             sys.exit()
 
-        if game_state == "choose_new_card":
-            game.make_choice_new_card()
-
-        elif game_state == "fight":
+        if game_state == "fight":
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if player_attack_square.collidepoint(event.pos):
                     print()
@@ -474,6 +506,9 @@ while True:
                         print(f"Played {card}. New hand: {hand}")
                         print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
                         break  # Exit loop after playing one card
+        
+        if game_state == "choose_new_card":
+            game.handle_choice_new_card()
 
 
 
