@@ -8,7 +8,7 @@ import sys
 
 pygame.init()
 
-screen = pygame.display.set_mode((1000, 800))
+screen = pygame.display.set_mode((1400, 1120))
 pygame.display.set_caption("Pygame Test")
 
 clock = pygame.time.Clock()
@@ -20,7 +20,10 @@ game_state = "fight"
 
 print("hello world")
 
-
+attack="attack"  #toying with the idea of defining move types as variables instead of strings
+defend="defend"  #"Feeling like programing well, might delete later"
+STR_up="STR-up"  
+DEF_up="DEF-up" 
 
 
 
@@ -46,8 +49,8 @@ Kori_pool = [
     move("Defend", 10, "defend", 1, tags={}),
     move("SMASH!", 25, "attack", 2, tags={}),
     move("Enrage", 5, "STR-up", 1, tags={"enrage": None}),
-    move("Concentrate", 5, "DEF-up", 1, tags={}),
-    move("poison strike", 7, "attack", 1, tags={"poison": 3, "placeholder": 3})
+    move("Gamble", 0, "spell", 1, tags={"redraw": True}),
+    move("Deck out", 7, "defend", 1, tags={"draw": 2})
 ]
 
 
@@ -65,14 +68,26 @@ Construct_pool = [
     move("construct", 10, "STR-up", 999,  tags={})
 ]
 
+Thug_pool = [
+    move("poison strike", 10, "attack", 999, tags={"poison": 3}),
+    move("smoke screen", 10, "defend", 999, tags={"blind": 1}),
+    move("slash", 5, "attack", 999, tags={"multihit": 4}),
+]
 
 
 floor1_loot = [
     move("Smash", 10, "attack", 1, tags={}),
     move("Block", 4, "defend", 0, tags={}),
     move("Power Up", 5, "STR-up", 1, tags={}),
-    move("poison strike", 7, "attack", 1, tags={"poison": 3, "placeholder": 3}),
-    move("pray", 5, "defend", 1, tags={"energised":1, }) #I thought about making it heal but that would promote delaying kills, which is not fun
+    move("poison strike", 7, "attack", 1, tags={"poison": 3}), #damages enemy at the end of turn
+    move("Concentrate", 5, "DEF-up", 1, tags={}), 
+    move("Shrug off", 20, "defend", 1, tags={}),
+    move("Deck out", 7, "defend", 0, tags={"draw": 2}), #draw 2 cards
+    move("Gamble", 0, "spell", 0, tags={"redraw": True}), #you draw a new hand, can only be used once per turn so you can't spam zero cost moves
+    move("Smite" , 10, "attack", 1, tags={"blind": 2}), #makes enemy attacks do 75% damage
+    move("Fury" , 6 , "attack", 1, tags={"multihit": 2}), #attack twice
+    move("Glare", 5, "attack", 0, tags={"blind": 1}), #enemy attacks do 75% damage
+    move("pray", 5, "defend", 1, tags={"energised":1, }), #I thought about making it heal but that would promote delaying kills, which is not fun, now it gives you +1 energy next turn
 ]
 
 
@@ -110,74 +125,110 @@ class player(champion):
     def __repr__(self):
         return f"{self.name} (HP: {self.HP}/{self.maxHP}, STR: {self.STR}, DEF: {self.DEF}, Energy: {self.Energy}, P.DMG: {self.pending_damage}, Block: {self.block}, pool: {self.poolname})"
 
-    def make_hand(self,):
-       return random.sample(self.pool, k=self.drawNum) 
+    def make_hand(self):
+        global hand
+        global Player
+        hand.clear()
+        hand = random.sample(Player.pool, k=Player.drawNum)
+        
     
     def resolve_move(self, move):
         global turn_count
         
 
 
-        if self.Energy < 1:
+        if self.Energy < move.cost:
             print("Not enough energy to play this move!")
             return 
-        self.Energy -= 1
+        self.Energy -= move.cost
         
-          # Remove the played card from hand
-
-        if move.type == "attack":
-            if Enemy.alive == False:
-                print(f"{Enemy.name} is already dead! Talk about beating a dead horse.")
-                return
-
-            given_damage = (move.power + self.STR) - (Enemy.block + Enemy.DEF)
-            if given_damage < 0:
-                given_damage = 0
-
-            Enemy.HP = Enemy.HP - given_damage
-
-            x=(f"{Enemy.name} took {given_damage} ({Enemy.block} block")
-            Enemy.block = Enemy.block - (move.power + self.STR)
-            if Enemy.block > 0:
-                x += f" {Enemy.block} block remaining!)"
-            else:
-                x += ")"
-                Enemy.block = 0
-
-            print(x)
-            given_damage = 0
-            x = ""
-
-        elif move.type == "defend":
-            self.block += move.power + self.DEF
-        elif move.type == "STR-up":
-            self.STR += move.power
-        elif move.type == "DEF-up":
-            self.DEF += move.power 
-        else:
-            print("What the fuck kind of move is that? What is happening?! I am going insane! AAARRRGH!!!")
-            return
-        global tags
+        multihit = 1
         for tag, tag_value in move.tags.items():
-            if tag == "enrage":
-                x = move.power / 2
-                x = round(x)
-                print(f"Applying 'enrage' effect! DEF before: {self.DEF}, reducing by {x}")
-                self.DEF -= x
-            
-            elif tag == "poison":
-                if "poison" in Enemy.status_effects:
-                    Enemy.status_effects["poison"] += tag_value  # Add to existing poison
-                    print(f"Poison stacked! Total poison damage: {Enemy.status_effects['poison']}")
+            if tag == "multihit":
+                multihit = tag_value
+                break
+
+          # Remove the played card from hand
+        while multihit >= 1:
+
+            if move.type == "attack":
+                if Enemy.alive == False:
+                    print(f"{Enemy.name} is already dead! Talk about beating a dead horse.")
+                    return
+
+                given_damage = (move.power + self.STR) - (Enemy.block + Enemy.DEF)
+                if given_damage < 0:
+                    given_damage = 0
+
+                Enemy.HP = Enemy.HP - given_damage
+
+                x=(f"{Enemy.name} took {given_damage} ({Enemy.block} block")
+                Enemy.block = Enemy.block - (move.power + self.STR)
+                if Enemy.block > 0:
+                    x += f" {Enemy.block} block remaining!)"
                 else:
-                    Enemy.status_effects["poison"] = tag_value  # Apply new poison
-                    print(f"Enemy poisoned! Poison damage: {tag_value}")
+                    x += ")"
+                    Enemy.block = 0
+
+                print(x)
+                given_damage = 0
+                x = ""
+
+            elif move.type == "defend":
+                self.block += move.power + self.DEF
+            elif move.type == "STR-up":
+                self.STR += move.power
+            elif move.type == "DEF-up":
+                self.DEF += move.power 
+            elif move.type == "spell": #all these moves are handled by tags
+                pass
+            else:
+                print("What the fuck kind of move is that? What is happening?! I am going insane! AAARRRGH!!!")
+                return
             
-            elif tag == "heal":
-                self.HP += tag_value
-                if self.HP > self.maxHP:
-                    self.HP = self.maxHP
-                print(f"{self.name} healed for {tag_value} HP! Current HP: {self.HP}")
+
+            for tag, tag_value in move.tags.items():
+                if tag == "enrage":
+                    x = move.power / 2
+                    x = round(x)
+                    print(f"Applying 'enrage' effect! DEF before: {self.DEF}, reducing by {x}")
+                    self.DEF -= x
+                
+                
+
+                elif tag == "energised":
+                    if "energised" in self.status_effects:
+                        self.status_effects["energised"] += tag_value
+                    else:
+                        self.status_effects["energised"] = tag_value
+
+                elif tag == "blind":
+                    if "blind" in Enemy.status_effects:
+                        Enemy.status_effects["blind"] += tag_value  # Add to existing blind
+                        print(f"Blind stacked! Total blind effect: {Enemy.status_effects['blind']}")
+                    else:
+                        Enemy.status_effects["blind"] = tag_value # Initial blind application
+                        x = Player.pending_damage*0.75
+                        x = round(x)
+                        Player.pending_damage = x
+                
+                elif tag == "poison":
+                    if "poison" in Enemy.status_effects:
+                        Enemy.status_effects["poison"] += tag_value  # Add to existing poison
+                        print(f"Poison stacked! Total poison damage: {Enemy.status_effects['poison']}")
+                    else: # now we give it poison
+                        Enemy.status_effects["poison"] = tag_value # Initial poison application
+                    
+                elif tag == "draw":
+                    new_cards = random.sample(self.pool, k=tag_value)
+                    hand.extend(new_cards)
+                    print(f"Drew {tag_value} cards: {[card.name for card in new_cards]}")
+
+                elif tag == "redraw":
+                    Player.make_hand()
+                    print(f"Redrew hand: {[card.name for card in hand]}")
+            
+            multihit -= 1
 
         if Enemy.HP <= 0:
             Enemy.alive = False
@@ -252,14 +303,49 @@ class foe(champion):
     def make_enemy_move(self):
         enemy_move = random.choice(self.pool)
         self.enemy_move = enemy_move
-        if enemy_move.type == "attack": 
-            Player.pending_damage += enemy_move.power + self.STR
-        elif enemy_move.type == "defend":
-            self.block += enemy_move.power + self.DEF
-        elif enemy_move.type == "STR-up":
-            self.STR += enemy_move.power
-        elif enemy_move.type == "DEF-up":
-            self.DEF += enemy_move.power
+        
+        multihit = 1
+        for tag, tag_value in enemy_move.tags.items():
+            if tag == "multihit":
+                multihit = tag_value
+                break
+
+
+        while multihit >= 1:
+            if enemy_move.type == "attack": 
+                if "blind" in Player.status_effects:
+                    x = (enemy_move.power + self.STR)*0.75
+                    x = round(x)
+                    Player.pending_damage += x
+                else:
+                    Player.pending_damage += enemy_move.power + self.STR
+            elif enemy_move.type == "defend":
+                self.block += enemy_move.power + self.DEF
+            elif enemy_move.type == "STR-up":
+                self.STR += enemy_move.power
+            elif enemy_move.type == "DEF-up":
+                self.DEF += enemy_move.power
+            elif enemy_move.type == "spell": #all these moves are handled by tags
+                pass
+
+            for tag, tag_value in enemy_move.tags.items():
+                if tag == "poison":
+                    Player.status_effects["poison"] += tag_value  
+                    print(f"Poison stacked! Total poison damage: {Player.status_effects['poison']}")
+                elif tag == "blind":
+                    if "blind" in Player.status_effects:
+                        Player.status_effects["blind"] += tag_value  # Add to existing blind
+                        print(f"Blind stacked! Total blind effect: {Player.status_effects['blind']}")
+                    else:
+                        Player.status_effects["blind"] = tag_value # Initial blind application
+                elif tag == "heal":
+                    self.HP += tag_value
+                    if self.HP > self.maxHP:
+                        self.HP = self.maxHP
+                    print(f"{self.name} healed for {tag_value} HP! Current HP: {self.HP}")   
+                
+            multihit -= 1
+ 
 
         print(f"{self.name} used {enemy_move.name}!")
 
@@ -267,11 +353,12 @@ class foe(champion):
 
 
 
-Joe=foe("Joe", 50, 0, 0, Joe_pool, "Joe pool")
-construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool")
-Enemy = copy.deepcopy(Joe)
-floor1_enemies = [Joe, construct]
+Joe=foe("Joe", 50 + random.randint(-5, 5), 0, 0, Joe_pool, "Joe pool")
+Construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool")
+Thug = foe("Thug", 80 + random.randint(-5, 5), 5 + random.randint(-1, 1), 0, Thug_pool, "Thug pool")
 
+Enemy = copy.deepcopy(Joe)
+floor1_enemies = [Joe, Construct]
 
 
 
@@ -345,14 +432,37 @@ class gameloop:
             if Enemy.status_effects["poison"] <= 0:
                 del Enemy.status_effects["poison"]
             game.kill_enemy()
+        
+        if "poison" in Player.status_effects:
+            poison_damage = Player.status_effects["poison"]
+            Player.HP -= poison_damage
+            print(f"{Player.name} takes {poison_damage} poison damage!")
+            Player.status_effects["poison"] -= 1
+            if Player.status_effects["poison"] <= 0:
+                del Player.status_effects["poison"]
+        
+        if "blind" in Player.status_effects:
+            Player.status_effects["blind"] -= 1
+            if Player.status_effects["blind"] <= 0:
+                del Player.status_effects["blind"]
+
+        if "blind" in Enemy.status_effects:
+            Enemy.status_effects["blind"] -= 1
+            if Enemy.status_effects["blind"] <= 0:
+                del Enemy.status_effects["blind"]
 
         Player.take_damage() 
 
         Enemy.make_enemy_move()
+
         Player.Energy = Player.MaxEnergy
+        if "energised" in Player.status_effects:
+            Player.Energy += Player.status_effects["energised"]
+            print(f"{Player.name} is energised and gains {Player.status_effects['energised']} extra energy this turn!")
+            del Player.status_effects["energised"]
 
 
-        hand = Player.make_hand()
+        Player.make_hand()
 
         print(f"New hand: {hand}")
         print()
@@ -395,31 +505,82 @@ class gameloop:
 
     def start_game(self):
         None
+    
+    #MAP GENERATING MAP HERE:
+    import random
+
+    def create_layers(num_layers=6, width_range=(2, 4)):
+        layers = []
+
+        for layer_index in range(num_layers):
+            layer_width = random.randint(*width_range)
+
+            layer = []
+            for node_index in range(layer_width):
+                node = Encounter_node(id=f"{layer_index}-{node_index}")
+                layer.append(node)
+
+            layers.append(layer)
+      
+        
+    def assign_encounters(layers):
+        encounter_types = ["battle", "elite", "shop", "rest", "event"]
+
+        for layer in layers:
+            for node in layer:
+                node.encounter_type = random.choice(encounter_types)
+                node.danger = random.randint(1, 5) #AI randomly generated me this, but I actually think this is a pretty good idea. It gives you a nice piece of risk and reward "do I go into the more dangerous place with a shop or the safer one without it"
+
+
+        return layers
+
+
+
+
+
+
+class Encounter_node:
+    def __init__(self, node_id, encounter_type, data=None):
+        self.id = node_id
+        self.encounter_type = encounter_type   # "battle", "shop", "elite", etc.
+        self.data = data or {}                 # loot, enemies, modifiers…
+        self.next_nodes = []                   # list of IDs or direct object refs
 
     
 game = gameloop(Player, Enemy)
 
 
-    
 
 
 
 
-# Define your squares: x, y, width, height
-player_square = pygame.Rect(0, 100, 430, 50)
-enemy_square = pygame.Rect(650, 100, 330, 50)
-player_attack_square = pygame.Rect(0, 200, 430, 50)
-enemy_attack_square = pygame.Rect(650, 200, 330, 50)
-resolve_square = pygame.Rect(400, 300, 200, 50)
-end_turn_square = pygame.Rect(400, 400, 200, 50)
-enemy_intent = pygame.Rect(650, 300, 330, 50)
-turn_count_square = pygame.Rect(450, 0, 100, 50)
-choose_new_card_square = pygame.Rect(400, 700, 100, 50)
-enemy_status_square = pygame.Rect(650, 400, 330, 50)
+
+# Define your squares: x, y, width, height (rearranged for 1400x1120 window)
+# Left column: player info and actions; Right column: enemy info and actions
+player_square = pygame.Rect(50, 100, 500, 80)
+enemy_square = pygame.Rect(850, 100, 500, 80)
+
+# Action buttons under each character panel
+player_attack_square = pygame.Rect(50, 220, 500, 80)
+enemy_attack_square = pygame.Rect(850, 220, 500, 80)
+
+# Center control buttons
+resolve_square = pygame.Rect(600, 720, 200, 80)
+end_turn_square = pygame.Rect(600, 830, 200, 80)
+
+# Intent and status panels
+enemy_intent = pygame.Rect(850, 320, 500, 80)
+player_status_square = pygame.Rect(50, 320, 500, 80)
+enemy_status_square = pygame.Rect(850, 420, 500, 80)
+
+# Top-center turn counter
+turn_count_square = pygame.Rect(600, 0, 200, 60)
+
+# Bottom-center new card chooser
+choose_new_card_square = pygame.Rect(600, 980, 200, 80)
 
 
-
-hand = Player.make_hand()
+Player.make_hand()
 
 
 def basic_draw():
@@ -434,6 +595,7 @@ def basic_draw():
     game.draw_button(screen, turn_count_square, f"Turn: {turn_count}")
     game.draw_button(screen, choose_new_card_square, "Choose New Card")
     game.draw_button(screen, enemy_status_square, f"Enemy Status: {Enemy.status_effects}")
+    game.draw_button(screen, player_status_square, f"Player Status: {Player.status_effects}")
 
 
 hand_start_x = 200
