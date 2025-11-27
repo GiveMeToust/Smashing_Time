@@ -25,6 +25,11 @@ Mým hlavním cílem je vytvořit v 2D karetní bojovou hru Pythonu s použitím
 >**Do druhé kontroly (mezi 26.1. a 6.2.):**
 >
 >  Mít plně hratelnou hru s roguelite mechanikama implementováními a mít základ uživatelského rozhraní.
+>
+>**Do odevzdání (do 1.4.):**
+> Donkončení uživatelského horzhraní a vyladění detailu.
+> Dokončení dokumentace.
+
 
 
 
