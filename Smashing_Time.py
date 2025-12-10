@@ -1,4 +1,5 @@
 import random
+import time
 from tkinter import font
 import copy
 import pygame
@@ -12,6 +13,15 @@ screen = pygame.display.set_mode((1400, 1120))
 pygame.display.set_caption("Pygame Test")
 
 clock = pygame.time.Clock()
+
+chance_of_branching = 0.5  # 50% chance to branch sideways in encounter map generation
+
+encounter_types = ["enemy", "shop", "rest", "event"]
+weights =          [   80,      5,      5,      10   ]  # might scrap events
+
+dramatic_pause = False #flag for dramatic pause before you get forwarded to an enemy encounter from the map, kinda silly but whatever
+dramatic_pause_timer = 1.5  # seconds
+
 
 
 hand = []
@@ -74,6 +84,14 @@ Thug_pool = [
     move("slash", 5, "attack", 999, tags={"multihit": 4}),
 ]
 
+Repair_Man_pool = [
+    move("weld", 20, "attack", 999, tags={}),
+    move("empty magazine", 3, "attack", 999, tags={"multihit": 6}),
+    move("brace", 20, "defend", 999, tags={}),
+    move("patch up", 20, "defend", 999, tags={"heal": 15}),
+    move("overclock", 10, "STR-up", 999, tags={}),
+]
+
 
 floor1_loot = [
     move("Smash", 10, "attack", 1, tags={}),
@@ -120,6 +138,7 @@ class player(champion):
         self.MaxEnergy = MaxEnergy
         self.Energy = MaxEnergy
         self.drawNum = drawNum
+        self.current_node = None
         
 
     def __repr__(self):
@@ -142,13 +161,14 @@ class player(champion):
             return 
         self.Energy -= move.cost
         
+        # Remove the played card from hand immediately
+        hand.remove(move)
+        
         multihit = 1
         for tag, tag_value in move.tags.items():
             if tag == "multihit":
                 multihit = tag_value
                 break
-
-          # Remove the played card from hand
         while multihit >= 1:
 
             if move.type == "attack":
@@ -173,6 +193,7 @@ class player(champion):
                 print(x)
                 given_damage = 0
                 x = ""
+                
 
             elif move.type == "defend":
                 self.block += move.power + self.DEF
@@ -233,10 +254,6 @@ class player(champion):
         if Enemy.HP <= 0:
             Enemy.alive = False
         game.kill_enemy()
-        
-
-
-        hand.remove(move)
 
 
 
@@ -356,9 +373,12 @@ class foe(champion):
 Joe=foe("Joe", 50 + random.randint(-5, 5), 0, 0, Joe_pool, "Joe pool")
 Construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool")
 Thug = foe("Thug", 80 + random.randint(-5, 5), 5 + random.randint(-1, 1), 0, Thug_pool, "Thug pool")
+Repair_Man = foe("Repair Man", 90, 0, 0, Repair_Man_pool, "Repair Man pool")
+
+
 
 Enemy = copy.deepcopy(Joe)
-floor1_enemies = [Joe, Construct]
+floor1_enemies = [Joe, Construct, Repair_Man, Thug]
 
 
 
@@ -395,11 +415,10 @@ class gameloop:
 
     def assign_new_enemy(self):
         global Enemy
-        if Enemy.alive == False:
-            print(f"{Enemy.name} has been defeated! A new enemy approaches!")
-            Enemy = copy.deepcopy(random.choice(floor1_enemies))
-            print(f"A wild {Enemy.name} appears!")
+        Enemy = copy.deepcopy(random.choice(floor1_enemies))
+        print(f"A wild {Enemy.name} appears!")
         
+
     def kill_enemy(self):
         global turn_count
         global Enemy
@@ -411,19 +430,8 @@ class gameloop:
             game.end_turn()
             turn_count = 0
 
-    def end_turn(self):
-        global turn_count
-        global hand
-        global Player
-        global Enemy
 
-        print()
-        print(f"New turn, {turn_count}")
-        turn_count += 1
-
-        Player.block = 0
-        Enemy.block = 0
-
+    def apply_status_effects(self):
         if "poison" in Enemy.status_effects:
             poison_damage = Enemy.status_effects["poison"]
             Enemy.HP -= poison_damage
@@ -450,6 +458,72 @@ class gameloop:
             Enemy.status_effects["blind"] -= 1
             if Enemy.status_effects["blind"] <= 0:
                 del Enemy.status_effects["blind"]
+
+
+
+
+    def handle_basic_logic(self):
+        global game_state
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if player_attack_square.collidepoint(event.pos):
+                print()
+                print("Player Attack button clicked!")
+                Enemy.HP -= 10  # Example action
+                print(f"Enemy.HP: {Enemy.HP}")
+
+            elif choose_new_card_square.collidepoint(event.pos):
+                print()
+                print("Choose New Card button clicked!")
+                game.start_new_card_selection()
+
+            elif enemy_attack_square.collidepoint(event.pos):
+                print()
+                print("Enemy Attack button clicked!")
+                Player.pending_damage += 10  # Example action
+                print(f"Player.pending_damage: {Player.pending_damage}")
+            elif resolve_square.collidepoint(event.pos):
+                print()
+                print("Resolve Damage button clicked!")
+                Player.take_damage()
+
+            elif end_turn_square.collidepoint(event.pos):
+                print()
+                print("End Turn button clicked!")
+                game.end_turn()
+
+            elif force_map.collidepoint(event.pos):
+                print()
+                print("Force Map button clicked!")
+                node_generation_or_something_idk.prepare_map()
+
+            for i, card in enumerate(hand):
+                # Calculate spacing exactly like draw_hand so the clickable rect matches drawn position
+                spacing = (end_x - hand_start_x - len(hand) * hand_card_width) / (len(hand) + 1) if (len(hand) + 1) > 0 else 0
+                card_x = hand_start_x + i * (hand_card_width + spacing)
+                card_rect = pygame.Rect(card_x, hand_start_y, hand_card_width, hand_card_height)
+                if card_rect.collidepoint(event.pos):
+                    print()
+                    print(f"Card {card.name} clicked!")
+                    Player.resolve_move(card)
+                    print(f"Played {card}. New hand: {hand}")
+                    print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
+                    break  # Exit loop after playing one card
+
+
+
+
+    def end_turn(self):
+        global turn_count
+        global hand
+        global Player
+        global Enemy
+
+        print()
+        print(f"New turn, {turn_count}")
+        turn_count += 1
+
+        Player.block = 0
+        Enemy.block = 0
 
         Player.take_damage() 
 
@@ -500,52 +574,227 @@ class gameloop:
                     chosen_card = current_choices[i]
                     Player.pool.append(chosen_card)
                     print(f"You chose {chosen_card.name} to add to your pool!")
-                    game_state = "fight"
+                    node_generation_or_something_idk.prepare_map()
                     return
 
     def start_game(self):
         None
     
-    #MAP GENERATING MAP HERE:
-    import random
 
-    def create_layers(num_layers=6, width_range=(2, 4)):
-        layers = []
+#--------------------------- Generate Map ---------------------------
 
-        for layer_index in range(num_layers):
-            layer_width = random.randint(*width_range)
 
-            layer = []
-            for node_index in range(layer_width):
-                node = Encounter_node(id=f"{layer_index}-{node_index}")
-                layer.append(node)
+class node_generation_or_something_idk:
+    def __init__(self, layer, layer_index, encounter_type):
+        self.layer = layer
+        self.layer_index = layer_index
+        self.encounter_type = encounter_type
+        self.connections = []
+        self.node_x = 0
+        self.node_y = 0
 
-            layers.append(layer)
-      
-        
-    def assign_encounters(layers):
-        encounter_types = ["battle", "elite", "shop", "rest", "event"]
+    
+    @staticmethod
+    def generate_layers(layer_width=4, layer_depth=8):
+        # layer_width: number of nodes per layer
+        # layer_depth: number of layers
 
-        for layer in layers:
-            for node in layer:
-                node.encounter_type = random.choice(encounter_types)
-                node.danger = random.randint(1, 5) #AI randomly generated me this, but I actually think this is a pretty good idea. It gives you a nice piece of risk and reward "do I go into the more dangerous place with a shop or the safer one without it"
+        layers = []  # this will hold all the layers
 
+
+
+        for layer_count in range(layer_depth):
+            layers.append([])  
+
+            for node_count in range(layer_width):
+                if layer_count == 0:
+                    if node_count == 0:
+                        encounter_type = "start"
+                        current_node = True
+                    else:
+                        continue  # only one start node
+                elif layer_count == layer_depth - 1:
+                    if node_count == 0:
+                        encounter_type = "boss"
+                    else:
+                        continue  # only one boss node
+                else:
+                    encounter_type = random.choices(encounter_types, weights=weights, k=1)[0]
+
+                node = node_generation_or_something_idk(layer_count, node_count, encounter_type)
+                layers[layer_count].append(node)
 
         return layers
 
+    
+    @staticmethod # staticmethod because it doesn't use self
+
+    def connect_layers(layers):
+        num_layers = len(layers)
+        if num_layers < 2:
+            return layers
+
+        for layer_idx in range(num_layers - 1):
+            cur = layers[layer_idx]
+            nxt = layers[layer_idx + 1]
+
+            # fast skip if current or next layer empty (shouldn't occur normally)
+            if not cur or not nxt:
+                continue
+
+            # 1) Primary pass: ensure every current node has at least one outgoing
+            for node in cur:
+                idx = node.layer_index
+
+                # clamp index to valid range of next layer so we always have a target
+                straight_idx = max(0, min(idx, len(nxt) - 1))
+                straight_target = nxt[straight_idx]
+                # add straight connection if not already there
+                if straight_target not in node.connections:
+                    node.connections.append(straight_target)
+
+                # optional sideways: left or right neighbor in next layer
+                if random.random() < chance_of_branching:
+                    direction = random.choice([-1, 1])  # -1 => left, +1 => right
+                    sideways_idx = idx + direction
+                    if 0 <= sideways_idx < len(nxt):
+                        sideways_target = nxt[sideways_idx]
+                        if sideways_target not in node.connections:
+                            node.connections.append(sideways_target)
+
+            # 2) Secondary pass: guarantee each node in next layer has >= 1 incoming
+            # Build incoming counts
+            incoming_map = {t: 0 for t in nxt}
+            for parent in cur:
+                for t in parent.connections:
+                    if t in incoming_map:
+                        incoming_map[t] += 1
+
+            # For any target with 0 incoming, pick a random parent and connect it
+            no_incoming = [t for t, cnt in incoming_map.items() if cnt == 0]
+            for target in no_incoming:
+                parent = random.choice(cur)
+                if target not in parent.connections:
+                    parent.connections.append(target)
+
+        return layers
+
+    def asign_node_positions(self):
+        if self.encounter_type == "start":
+            self.node_x = 500 # middle of the row of nodes, subject to change but I don't want to bother with calculating it
+            self.node_y = 100 + self.layer * 120 #self.layer is zero
+        elif self.encounter_type == "boss":
+            self.node_x = 500
+            self.node_y = 100 + self.layer * 120 #self.layer is not zero
+        else:
+            self.node_x = 200 + self.layer_index * 200
+            self.node_y = 100 + self.layer * 120
+
+    def __repr__(self):
+        return f"{self.encounter_type} {self.layer}, {self.layer_index}"
+    
+    @staticmethod
+    def prepare_map():
+        global game_state
+        Player.current_node = layers[0][0]
+        game_state = "map"
+
+    
+    def draw_map(self):
+        for layer in layers:
+            for node in layer:
+                
+                # Draw connections
+                for target in node.connections:
+                    pygame.draw.line(screen, (255, 255, 255), (node.node_x, node.node_y), (target.node_x, target.node_y), 2) # white , width 2
+                    #I have literally no idea why this works. And I mean LITERALLY no idea. But it does. Like, what the hell is even "target"???
+                    # Nevermind, I am just sleep deprived. It's extremely obvious what target is. I am an idiot.
+
+
+                if node.encounter_type == "start":
+                    pygame.draw.circle(screen, (0, 255, 0), (node.node_x, node.node_y), 30)  # Green for start
+                    font = pygame.font.SysFont(None, 24)
+                    text_surface = font.render(node.encounter_type, True, (0, 0, 0))
+                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
+                    screen.blit(text_surface, text_rect)
+
+
+                elif node.encounter_type == "boss":
+                    pygame.draw.circle(screen, (255, 0, 0), (node.node_x, node.node_y), 30)  # Red for boss
+                    font = pygame.font.SysFont(None, 24)
+                    text_surface = font.render(node.encounter_type, True, (0, 0, 0))
+                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
+                    screen.blit(text_surface, text_rect)
+
+                
+
+
+                else:
+                    pygame.draw.circle(screen, (255, 255, 255), (node.node_x, node.node_y), 30) # red, green, blue - x, y - radius
+                    font = pygame.font.SysFont(None, 15) # default font, size 15
+                    text_surface = font.render(f"{node.encounter_type} {node.layer}, {node.layer_index}", True, (0, 0, 0))
+                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
+                    screen.blit(text_surface, text_rect)
+
+                if node is Player.current_node: # if the node and the player's current node are the same
+                    pygame.draw.circle(screen, (255, 215, 0), (node.node_x, node.node_y), 35, 3)  # highlighted with yellow
+        
+    def handle_map_logic(self):
+        global game_state
+        global Enemy
+        global Player
+        global dramatic_pause
+        global dramatic_pause_timer
+
+        
+        if dramatic_pause == True:
+            print("Dramatic pause before forwarding you to an enemy encounter...")
+            time.sleep(dramatic_pause_timer)           
+            game.assign_new_enemy()
+            Player.make_hand()
+            game_state = "fight"
+            dramatic_pause = False
+        
+
+        for layer in layers:
+            for node in layer:
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    distance = ((event.pos[0] - node.node_x) ** 2 + (event.pos[1] - node.node_y) ** 2) ** 0.5
+                    if distance <= 30:  # assuming node radius is 30
+                        if node in Player.current_node.connections:
+                            print(f"Moving to node: {node}")
+                            Player.current_node = node
+                            if node.encounter_type == "enemy":
+                                
+                                print("Encounter enemy!")
+                                dramatic_pause = True
+                                
+
+
+                        else:
+                            print("You can't move to that node from your current position.")
 
 
 
+map_generation = node_generation_or_something_idk(layer=0, layer_index=0, encounter_type="start")
 
+map_generation.asign_node_positions()
 
-class Encounter_node:
-    def __init__(self, node_id, encounter_type, data=None):
-        self.id = node_id
-        self.encounter_type = encounter_type   # "battle", "shop", "elite", etc.
-        self.data = data or {}                 # loot, enemies, modifiers…
-        self.next_nodes = []                   # list of IDs or direct object refs
+layers = node_generation_or_something_idk.generate_layers(layer_width=4, layer_depth=8)
+layers = node_generation_or_something_idk.connect_layers(layers)
 
+Player.current_node = layers[0][0]  # start at the start node
+
+# Assign positions to all nodes
+for layer in layers:
+    for node in layer:
+        node.asign_node_positions()
+
+print("Generated Encounter Map:")
+for layer in layers:
+    for node in layer:
+        connections = [f"Layer {n.layer} Index {n.layer_index}" for n in node.connections]
+        print(f"Node (Layer {node.layer}, Index {node.layer_index}, Type: {node.encounter_type}) -> Connections: {connections}")
     
 game = gameloop(Player, Enemy)
 
@@ -579,6 +828,10 @@ turn_count_square = pygame.Rect(600, 0, 200, 60)
 # Bottom-center new card chooser
 choose_new_card_square = pygame.Rect(600, 980, 200, 80)
 
+force_map = pygame.Rect(1200, 0, 200, 60)
+
+Eror_screen = pygame.Rect(0, 0, 1400, 1120)
+
 
 Player.make_hand()
 
@@ -596,7 +849,10 @@ def basic_draw():
     game.draw_button(screen, choose_new_card_square, "Choose New Card")
     game.draw_button(screen, enemy_status_square, f"Enemy Status: {Enemy.status_effects}")
     game.draw_button(screen, player_status_square, f"Player Status: {Player.status_effects}")
+    game.draw_button(screen, force_map, "Force Map")
 
+def draw_error_screen():
+    game.draw_button(screen, Eror_screen, "ERROR: Invalid Game State")
 
 hand_start_x = 200
 hand_start_y = 500
@@ -609,13 +865,20 @@ end_x= 800
 
 enemy_move = Enemy.make_enemy_move()
 
+#------------------------------- Main Pygame Loop -------------------------------
+
 while True:
     screen.fill((0, 0, 0))
 
     if game_state == "fight":
         basic_draw()
-    if game_state == "choose_new_card":
+    elif game_state == "choose_new_card":
         game.make_choice_new_card()
+    elif game_state == "map":
+        map_generation.draw_map()
+    else:
+        draw_error_screen()
+        
         
 
 
@@ -627,50 +890,14 @@ while True:
             sys.exit()
 
         if game_state == "fight":
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if player_attack_square.collidepoint(event.pos):
-                    print()
-                    print("Player Attack button clicked!")
-                    Enemy.HP -= 10  # Example action
-                    print(f"Enemy.HP: {Enemy.HP}")
-
-                elif choose_new_card_square.collidepoint(event.pos):
-                    print()
-                    print("Choose New Card button clicked!")
-                    game.start_new_card_selection()
-
-                elif enemy_attack_square.collidepoint(event.pos):
-                    print()
-                    print("Enemy Attack button clicked!")
-                    Player.pending_damage += 10  # Example action
-                    print(f"Player.pending_damage: {Player.pending_damage}")
-
-                elif resolve_square.collidepoint(event.pos):
-                    print()
-                    print("Resolve Damage button clicked!")
-                    Player.take_damage()
-
-                elif end_turn_square.collidepoint(event.pos):
-                    print()
-                    print("End Turn button clicked!")
-                    game.end_turn()
-
-                
-                for i, card in enumerate(hand):
-                    # Calculate spacing exactly like draw_hand so the clickable rect matches drawn position
-                    spacing = (end_x - hand_start_x - len(hand) * hand_card_width) / (len(hand) + 1) if (len(hand) + 1) > 0 else 0
-                    card_x = hand_start_x + i * (hand_card_width + spacing)
-                    card_rect = pygame.Rect(card_x, hand_start_y, hand_card_width, hand_card_height)
-                    if card_rect.collidepoint(event.pos):
-                        print()
-                        print(f"Card {card.name} clicked!")
-                        Player.resolve_move(card)
-                        print(f"Played {card}. New hand: {hand}")
-                        print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
-                        break  # Exit loop after playing one card
+            game.handle_basic_logic()
         
+
         if game_state == "choose_new_card":
             game.handle_choice_new_card()
+        
+        if game_state == "map":
+            map_generation.handle_map_logic()
 
 
 
