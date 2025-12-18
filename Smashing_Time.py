@@ -27,6 +27,7 @@ dramatic_pause_timer = 1.5  # seconds
 hand = []
 turn_count =  1
 game_state = "fight"
+rest_done = False
 
 print("hello world")
 
@@ -97,14 +98,15 @@ floor1_loot = [
     move("Smash", 10, "attack", 1, tags={}),
     move("Block", 4, "defend", 0, tags={}),
     move("Power Up", 5, "STR-up", 1, tags={}),
-    move("poison strike", 7, "attack", 1, tags={"poison": 3}), #damages enemy at the end of turn
+    move("poison strike", 7, "attack", 1, tags={"poison": 3}), #damages enemy at the end of turn, then loses 1 poison
+    move("poison bomb", 2, "attack", 2, tags={"poison": 5}), 
     move("Concentrate", 5, "DEF-up", 1, tags={}), 
     move("Shrug off", 20, "defend", 1, tags={}),
     move("Deck out", 7, "defend", 0, tags={"draw": 2}), #draw 2 cards
     move("Gamble", 0, "spell", 0, tags={"redraw": True}), #you draw a new hand, can only be used once per turn so you can't spam zero cost moves
     move("Smite" , 10, "attack", 1, tags={"blind": 2}), #makes enemy attacks do 75% damage
     move("Fury" , 6 , "attack", 1, tags={"multihit": 2}), #attack twice
-    move("Glare", 5, "attack", 0, tags={"blind": 1}), #enemy attacks do 75% damage
+    move("Glare", 5, "attack", 0, tags={"blind": 1}), #enemy attacks do 75% damage for x turns
     move("pray", 5, "defend", 1, tags={"energised":1, }), #I thought about making it heal but that would promote delaying kills, which is not fun, now it gives you +1 energy next turn
 ]
 
@@ -138,7 +140,7 @@ class player(champion):
         self.MaxEnergy = MaxEnergy
         self.Energy = MaxEnergy
         self.drawNum = drawNum
-        self.current_node = None
+        self.current_node = None # player's current position on the map, current_node = layers[0][0] is not yet defined so I have to set it up later because coding is stupid and not a real person like it should be. Fucking moron. All my code should be run by genetically modified hamsters with PhDs in computer science, not by this piece of shit garbage that can't even remember to set a variable properly
         
 
     def __repr__(self):
@@ -292,19 +294,12 @@ class player(champion):
 
             
 
-
-
-
-
-
-
-
-
-
-
-
 Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", 3, 5)
 Player = copy.deepcopy(Kori)
+
+
+
+
 
 
 
@@ -370,15 +365,15 @@ class foe(champion):
 
 
 
-Joe=foe("Joe", 50 + random.randint(-5, 5), 0, 0, Joe_pool, "Joe pool")
+Joe=foe("Joe", 50 + random.randint(-5, 5) , 0, 0, Joe_pool, "Joe pool")
 Construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool")
 Thug = foe("Thug", 80 + random.randint(-5, 5), 5 + random.randint(-1, 1), 0, Thug_pool, "Thug pool")
 Repair_Man = foe("Repair Man", 90, 0, 0, Repair_Man_pool, "Repair Man pool")
 
-
-
 Enemy = copy.deepcopy(Joe)
-floor1_enemies = [Joe, Construct, Repair_Man, Thug]
+
+
+
 
 
 
@@ -416,6 +411,8 @@ class gameloop:
     def assign_new_enemy(self):
         global Enemy
         Enemy = copy.deepcopy(random.choice(floor1_enemies))
+        Enemy.maxHP = round(Enemy.maxHP*(1 + (Player.current_node.danger_level * 0.1)))
+        Enemy.HP = Enemy.maxHP
         print(f"A wild {Enemy.name} appears!")
         
 
@@ -494,8 +491,14 @@ class gameloop:
             elif force_map.collidepoint(event.pos):
                 print()
                 print("Force Map button clicked!")
-                node_generation_or_something_idk.prepare_map()
+                map_generation.prepare_map()
 
+            elif force_rest.collidepoint(event.pos):
+                print()
+                print("Force Rest button clicked!")
+                game_state = "rest"
+                
+            
             for i, card in enumerate(hand):
                 # Calculate spacing exactly like draw_hand so the clickable rect matches drawn position
                 spacing = (end_x - hand_start_x - len(hand) * hand_card_width) / (len(hand) + 1) if (len(hand) + 1) > 0 else 0
@@ -574,7 +577,7 @@ class gameloop:
                     chosen_card = current_choices[i]
                     Player.pool.append(chosen_card)
                     print(f"You chose {chosen_card.name} to add to your pool!")
-                    node_generation_or_something_idk.prepare_map()
+                    map_generation.prepare_map()
                     return
 
     def start_game(self):
@@ -589,13 +592,15 @@ class node_generation_or_something_idk:
         self.layer = layer
         self.layer_index = layer_index
         self.encounter_type = encounter_type
+        self.danger_level = 0
+        self.escpecially_dangerous = False
         self.connections = []
         self.node_x = 0
         self.node_y = 0
 
     
-    @staticmethod
-    def generate_layers(layer_width=4, layer_depth=8):
+    
+    def generate_layers(self, layer_width=4, layer_depth=8):
         # layer_width: number of nodes per layer
         # layer_depth: number of layers
 
@@ -610,7 +615,6 @@ class node_generation_or_something_idk:
                 if layer_count == 0:
                     if node_count == 0:
                         encounter_type = "start"
-                        current_node = True
                     else:
                         continue  # only one start node
                 elif layer_count == layer_depth - 1:
@@ -627,9 +631,9 @@ class node_generation_or_something_idk:
         return layers
 
     
-    @staticmethod # staticmethod because it doesn't use self
+    
 
-    def connect_layers(layers):
+    def connect_layers(self, layers):
         num_layers = len(layers)
         if num_layers < 2:
             return layers
@@ -679,7 +683,7 @@ class node_generation_or_something_idk:
 
         return layers
 
-    def asign_node_positions(self):
+    def assign_node_positions(self):
         if self.encounter_type == "start":
             self.node_x = 500 # middle of the row of nodes, subject to change but I don't want to bother with calculating it
             self.node_y = 100 + self.layer * 120 #self.layer is zero
@@ -690,13 +694,20 @@ class node_generation_or_something_idk:
             self.node_x = 200 + self.layer_index * 200
             self.node_y = 100 + self.layer * 120
 
+    def assign_node_danger_level(self):
+       if self.encounter_type == "enemy":
+            self.danger_level = self.layer * 1
+            if random.random() < 0.2:  # 20% chance to increase danger level
+                self.danger_level += 3
+                self.escpecially_dangerous = True
+
+
     def __repr__(self):
         return f"{self.encounter_type} {self.layer}, {self.layer_index}"
     
-    @staticmethod
-    def prepare_map():
+
+    def prepare_map(self): # So this is pretty much useless
         global game_state
-        Player.current_node = layers[0][0]
         game_state = "map"
 
     
@@ -726,8 +737,24 @@ class node_generation_or_something_idk:
                     text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
                     screen.blit(text_surface, text_rect)
 
-                
+                elif node.encounter_type == "enemy":
+                    if node.escpecially_dangerous == False:
+                        pygame.draw.circle(screen, (255, 255, 255), (node.node_x, node.node_y), 30) # red, green, blue - x, y - radius
+                    else:
+                        pygame.draw.circle(screen, (255, 0, 255), (node.node_x, node.node_y), 30) # magenta for especially dangerous enemies
+                    font = pygame.font.SysFont(None, 15) # default font, size 15
+                    text_surface = font.render(f"{node.encounter_type} {node.layer}, {node.layer_index}", True, (0, 0, 0))
+                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
+                    screen.blit(text_surface, text_rect)
 
+                elif node.encounter_type == "rest":
+                    pygame.draw.circle(screen, (210, 180, 140), (node.node_x, node.node_y), 30)  # Brown for rest
+                    font = pygame.font.SysFont(None, 15) # default font, size 15
+                    text_surface = font.render(f"{node.encounter_type} {node.layer}, {node.layer_index}", True, (255, 255, 255))
+                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
+                    screen.blit(text_surface, text_rect)    
+
+               
 
                 else:
                     pygame.draw.circle(screen, (255, 255, 255), (node.node_x, node.node_y), 30) # red, green, blue - x, y - radius
@@ -747,27 +774,30 @@ class node_generation_or_something_idk:
         global dramatic_pause_timer
 
         
-        if dramatic_pause == True:
-            print("Dramatic pause before forwarding you to an enemy encounter...")
-            time.sleep(dramatic_pause_timer)           
-            game.assign_new_enemy()
-            Player.make_hand()
-            game_state = "fight"
-            dramatic_pause = False
+
         
 
         for layer in layers:
             for node in layer:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     distance = ((event.pos[0] - node.node_x) ** 2 + (event.pos[1] - node.node_y) ** 2) ** 0.5
-                    if distance <= 30:  # assuming node radius is 30
+                    if distance <= 30:  # node radius is 30, at least for now
                         if node in Player.current_node.connections:
+
                             print(f"Moving to node: {node}")
                             Player.current_node = node
                             if node.encounter_type == "enemy":
-                                
-                                print("Encounter enemy!")
-                                dramatic_pause = True
+                                game.assign_new_enemy()
+                                Player.make_hand()
+                                game_state = "fight"
+
+                            elif node.encounter_type == "boss":
+                                print("I don't have boss yer, sorry")
+                                print("I guess you win?")
+                            
+                            elif node.encounter_type == "rest":
+                                game_state = "rest"
+
                                 
 
 
@@ -776,19 +806,73 @@ class node_generation_or_something_idk:
 
 
 
+    def draw_rest(self):
+        x=Player.maxHP * 0.2
+        x = round(x)
+
+
+        pygame.draw.rect(screen, (0, 255, 0), (500, 500, 400, 100))  # Big green heal button
+        font = pygame.font.SysFont(None, 36)
+        text_surface = font.render(f"heal for 20% of max HP({x})", True, (0, 0, 0))  # Black text
+        text_rect = text_surface.get_rect(center=(700, 540))
+        screen.blit(text_surface, text_rect)
+
+        pygame.draw.rect(screen, (255, 255, 255), (600, 650, 200, 80))  # White continue button
+        text_surface = font.render("continue", True, (0, 0, 0))  # Black text
+        text_rect = text_surface.get_rect(center=(700, 690))
+        screen.blit(text_surface, text_rect)
+
+        pygame.draw.rect(screen, (0, 128, 255), (0, 0, 800, 40))  # blue player info button
+        font = pygame.font.SysFont(None, 20)
+        text_surface = font.render(f"{Player}", True, (255, 255, 255))  # White text
+        screen.blit(text_surface, (10, 10))
+
+        pygame.draw.rect(screen, (255, 255, 255), (550, 800, 300, 50))  # White upgrade button - so far not implemented
+        font = pygame.font.SysFont(None, 18)
+        text_surface = font.render("Upgrade- PLACEHOLDER, NOT IMPLEMENTED", True, (0, 0, 0))  # black text
+        screen.blit(text_surface, (560, 810))
+
+
+    def handle_rest_logic(self):
+        global game_state
+        global rest_done # False by default
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            heal_button_rect = pygame.Rect(500, 500, 400, 100)
+            continue_button_rect = pygame.Rect(600, 650, 200, 80)
+
+            if heal_button_rect.collidepoint(event.pos):
+                x = Player.maxHP * 0.2
+                x = round(x)
+                Player.HP += x
+                if Player.HP > Player.maxHP:
+                    Player.HP = Player.maxHP
+                print(f"{Player.name} healed for {x} HP! Current HP: {Player.HP}")
+
+                rest_done = True
+
+            elif continue_button_rect.collidepoint(event.pos):
+                if rest_done == False:
+                    print("It would be a shame to waste this rest, take another action before continuing the journey.")
+                else:
+                    print("Continuing the journey...")
+                    game_state = "map"
+                    rest_done = False
+
 map_generation = node_generation_or_something_idk(layer=0, layer_index=0, encounter_type="start")
 
-map_generation.asign_node_positions()
 
-layers = node_generation_or_something_idk.generate_layers(layer_width=4, layer_depth=8)
-layers = node_generation_or_something_idk.connect_layers(layers)
+
+layers = map_generation.generate_layers(layer_width=4, layer_depth=8)
+layers = map_generation.connect_layers(layers)
 
 Player.current_node = layers[0][0]  # start at the start node
 
-# Assign positions to all nodes
+# Assign positions and danger levels to all nodes
 for layer in layers:
     for node in layer:
-        node.asign_node_positions()
+        node.assign_node_positions()
+        node.assign_node_danger_level()
 
 print("Generated Encounter Map:")
 for layer in layers:
@@ -800,6 +884,15 @@ game = gameloop(Player, Enemy)
 
 
 
+
+
+Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", 3, 5)
+Player = copy.deepcopy(Kori)
+Player.current_node = layers[0][0]
+
+
+Enemy = copy.deepcopy(Joe)
+floor1_enemies = [Joe, Construct, Repair_Man, Thug]
 
 
 
@@ -828,7 +921,9 @@ turn_count_square = pygame.Rect(600, 0, 200, 60)
 # Bottom-center new card chooser
 choose_new_card_square = pygame.Rect(600, 980, 200, 80)
 
-force_map = pygame.Rect(1200, 0, 200, 60)
+# Bottom-left force map and rest buttons, 1 pixel apart
+force_map = pygame.Rect(1250, 959, 150, 80)
+force_rest = pygame.Rect(1250, 1040, 150, 80)
 
 Eror_screen = pygame.Rect(0, 0, 1400, 1120)
 
@@ -836,7 +931,7 @@ Eror_screen = pygame.Rect(0, 0, 1400, 1120)
 Player.make_hand()
 
 
-def basic_draw():
+def basic_draw_fight():
     game.draw_button(screen, player_square, Player.__repr__())
     game.draw_button(screen, enemy_square, Enemy.__repr__())
     game.draw_button(screen, player_attack_square, "Player Attack")    
@@ -850,6 +945,7 @@ def basic_draw():
     game.draw_button(screen, enemy_status_square, f"Enemy Status: {Enemy.status_effects}")
     game.draw_button(screen, player_status_square, f"Player Status: {Player.status_effects}")
     game.draw_button(screen, force_map, "Force Map")
+    game.draw_button(screen, force_rest, "Force Rest")
 
 def draw_error_screen():
     game.draw_button(screen, Eror_screen, "ERROR: Invalid Game State")
@@ -871,11 +967,17 @@ while True:
     screen.fill((0, 0, 0))
 
     if game_state == "fight":
-        basic_draw()
+        basic_draw_fight()
+
     elif game_state == "choose_new_card":
         game.make_choice_new_card()
+
     elif game_state == "map":
         map_generation.draw_map()
+
+    elif game_state == "rest":
+        map_generation.draw_rest()
+
     else:
         draw_error_screen()
         
@@ -898,6 +1000,9 @@ while True:
         
         if game_state == "map":
             map_generation.handle_map_logic()
+        
+        if game_state == "rest":
+            map_generation.handle_rest_logic()
 
 
 
