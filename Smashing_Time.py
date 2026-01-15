@@ -9,15 +9,19 @@ import sys
 
 pygame.init()
 
-screen = pygame.display.set_mode((1400, 1120))
-pygame.display.set_caption("Pygame Test")
+
+VIRTUAL_SIZE = (2560, 1440)
+rscreen = pygame.display.set_mode((0, 0), pygame.RESIZABLE)  #this is the real screen that gets resized and actually shown (x,y) means starting dimiensions, 0,0 means full screen
+vscreen = pygame.Surface(VIRTUAL_SIZE)  # virtual screen that we draw everything to, then scale to rscreen size
+
+pygame.display.set_caption("Smashing Time")
 
 clock = pygame.time.Clock()
 
 chance_of_branching = 0.5  # 50% chance to branch sideways in encounter map generation
 
-encounter_types = ["enemy", "shop", "rest", "event"]
-weights =          [   80,      5,      5,      10   ]  # might scrap events
+encounter_types = ["enemy", "shop", "rest",]
+weights =          [   90,      5,      5, ]  # might scrap events - Actually I did scrap them them, now is later
 
 dramatic_pause = False #flag for dramatic pause before you get forwarded to an enemy encounter from the map, kinda silly but whatever
 dramatic_pause_timer = 1.5  # seconds
@@ -27,7 +31,9 @@ dramatic_pause_timer = 1.5  # seconds
 hand = []
 turn_count =  1
 game_state = "fight"
+settings =  False
 rest_done = False
+is_boss_fight = False #flag for if current fight is a boss fight, mostly used so you get a new map after beating a boss
 
 print("hello world")
 
@@ -38,6 +44,15 @@ DEF_up="DEF-up"
 
 
 
+
+settings_grey_out = pygame.Surface((2560, 1440)) # over the whole screen
+settings_grey_out.fill((0, 0, 0))  # Black color
+settings_grey_out.set_alpha(128)  # Set transparency level (0-255)
+
+quit_from_settings = pygame.Rect(1180, 700, 200, 100)  # x, y, width, height
+
+cost_of_cards = 30 
+cost_of_supplies = 20
 
 class move:
     def __init__(self, name, power, type, cost, tags):
@@ -61,7 +76,8 @@ Kori_pool = [
     move("SMASH!", 25, "attack", 2, tags={}),
     move("Enrage", 5, "STR-up", 1, tags={"enrage": None}),
     move("Gamble", 0, "spell", 1, tags={"redraw": True}),
-    move("Deck out", 7, "defend", 1, tags={"draw": 2})
+    move("Deck out", 7, "defend", 1, tags={"draw": 2}),
+    move("poison strike", 7, "attack", 1, tags={"poison": 3}),
 ]
 
 
@@ -93,6 +109,13 @@ Repair_Man_pool = [
     move("overclock", 10, "STR-up", 999, tags={}),
 ]
 
+Extremely_Sucpicious_Barell_pool = [
+    move("do nothing", 40, "defend", 999, tags={}),
+    move("do nothing", 40, "defend", 999, tags={}),
+    move("sucpicious sounds", 20, "attack", 999, tags={}),
+]
+
+explode_move = move("explode", 9999, "attack", 0, tags={}) #that's a suprise tool that will help us later
 
 floor1_loot = [
     move("Smash", 10, "attack", 1, tags={}),
@@ -113,7 +136,7 @@ floor1_loot = [
 
 
 class champion:
-    def __init__(self, name, maxHP, STR, DEF, pool, poolname):
+    def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects):
         self.name = name
         self.maxHP = maxHP
         self.HP = maxHP
@@ -126,7 +149,7 @@ class champion:
         self.block = 0
         self.pool = pool
         self.poolname = poolname
-        self.status_effects = {}
+        self.status_effects = status_effects # usually empty when created, a dictionary of status effects and their values or lack of therefore
 
     def __repr__(self):
         return f"{self.name} (maxHP: {self.maxHP}, HP: {self.HP}, STR: {self.STR}, DEF: {self.DEF}, pool: {self.poolname})"
@@ -135,16 +158,17 @@ class champion:
 
 
 class player(champion):
-    def __init__(self, name, maxHP, STR, DEF, pool, poolname, MaxEnergy, drawNum):
-        super().__init__(name, maxHP, STR, DEF, pool, poolname)
+    def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects, MaxEnergy, drawNum,):
+        super().__init__(name, maxHP, STR, DEF, pool, poolname, status_effects)
         self.MaxEnergy = MaxEnergy
         self.Energy = MaxEnergy
         self.drawNum = drawNum
         self.current_node = None # player's current position on the map, current_node = layers[0][0] is not yet defined so I have to set it up later because coding is stupid and not a real person like it should be. Fucking moron. All my code should be run by genetically modified hamsters with PhDs in computer science, not by this piece of shit garbage that can't even remember to set a variable properly
+        self.money = 0
         
 
     def __repr__(self):
-        return f"{self.name} (HP: {self.HP}/{self.maxHP}, STR: {self.STR}, DEF: {self.DEF}, Energy: {self.Energy}, P.DMG: {self.pending_damage}, Block: {self.block}, pool: {self.poolname})"
+        return f"{self.name} (HP: {self.HP}/{self.maxHP}, STR: {self.STR}, DEF: {self.DEF}, Energy: {self.Energy}, P.DMG: {self.pending_damage}, Block: {self.block}, pool: {self.poolname}, $: {self.money})"
 
     def make_hand(self):
         global hand
@@ -294,7 +318,7 @@ class player(champion):
 
             
 
-Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", 3, 5)
+Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", {}, 3, 5)
 Player = copy.deepcopy(Kori)
 
 
@@ -304,8 +328,8 @@ Player = copy.deepcopy(Kori)
 
 
 class foe(champion):
-    def __init__(self, name, maxHP, STR, DEF, pool, poolname):
-        super().__init__(name, maxHP, STR, DEF, pool, poolname)  
+    def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects):
+        super().__init__(name, maxHP, STR, DEF, pool, poolname, status_effects)  
     
 
 
@@ -365,12 +389,24 @@ class foe(champion):
 
 
 
-Joe=foe("Joe", 50 + random.randint(-5, 5) , 0, 0, Joe_pool, "Joe pool")
-Construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool")
-Thug = foe("Thug", 80 + random.randint(-5, 5), 5 + random.randint(-1, 1), 0, Thug_pool, "Thug pool")
-Repair_Man = foe("Repair Man", 90, 0, 0, Repair_Man_pool, "Repair Man pool")
-
+Joe=foe("Joe", 50 + random.randint(-5, 5) , 0, 0, Joe_pool, "Joe pool", {})
+Construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool", {})
+Thug = foe("Thug", 80 + random.randint(-5, 5), 5 + random.randint(-1, 1), 0, Thug_pool, "Thug pool", {})
+Repair_Man = foe("Repair Man", 200, 0, 0, Repair_Man_pool, "Repair Man pool", {})
+Extremely_Sucpicious_Barell = foe("Extremely Sucpicious Barell", 80 + random.randint(-5, 5), 0, 0, Extremely_Sucpicious_Barell_pool, "Extremely Sucpicious Barell pool",  {"explosive": 5}) #explodes after x turns, gains 2*x block every turn
 Enemy = copy.deepcopy(Joe)
+
+floor1_enemies = [Joe, Construct, Thug, Extremely_Sucpicious_Barell]
+boss_enemies = [Repair_Man]
+
+
+
+
+
+
+
+
+
 
 
 
@@ -386,14 +422,14 @@ class gameloop:
     def __repr__(self):
         return f"Game Loop (Player: {self.Player}, Enemy: {self.enemy})"
 
-    def draw_button(self, screen, button_rect, text):     #button function
-        pygame.draw.rect(screen, (0, 128, 255), button_rect)  # color: blue
+    def draw_button(self, vscreen, button_rect, text):     #button function
+        pygame.draw.rect(vscreen, (0, 128, 255), button_rect)  # color: blue
         font = pygame.font.SysFont(None, 18)    #default font, size 18
         text_surface = font.render(text, True, (255, 255, 255)) # text, anti-aliased, white
-        screen.blit(text_surface, (button_rect.x + 10, button_rect.y + 10))
+        vscreen.blit(text_surface, (button_rect.x + 10, button_rect.y + 10))
 
 
-    def draw_hand(self,screen, hand, start_x, start_y, end_x,  card_width, card_height):
+    def draw_hand(self,vscreen, hand, start_x, start_y, end_x,  card_width, card_height):
 
         L = end_x - start_x
         
@@ -401,31 +437,55 @@ class gameloop:
 
         for i, card in enumerate(hand):
             card_rect = pygame.Rect(start_x + i * (card_width + spacing), start_y, card_width, card_height)
-            pygame.draw.rect(screen, (255, 255, 255), card_rect)  # White card background
+            pygame.draw.rect(vscreen, (255, 255, 255), card_rect)  # White card background
             font = pygame.font.SysFont(None, 24)
             text_surface = font.render(card.name, True, (0, 0, 0))  # Black text
             text_rect = text_surface.get_rect(center=card_rect.center)
-            screen.blit(text_surface, text_rect) # Draw card name centered on the card
+            vscreen.blit(text_surface, text_rect) # Draw card name centered on the card
 
 
     def assign_new_enemy(self):
         global Enemy
-        Enemy = copy.deepcopy(random.choice(floor1_enemies))
-        Enemy.maxHP = round(Enemy.maxHP*(1 + (Player.current_node.danger_level * 0.1)))
-        Enemy.HP = Enemy.maxHP
-        print(f"A wild {Enemy.name} appears!")
+        global is_boss_fight
+        if Player.current_node.encounter_type == "boss":
+            is_boss_fight = True
+            Enemy = copy.deepcopy(random.choice(boss_enemies))
+            Enemy.maxHP = round(Enemy.maxHP*(1 + (Player.current_node.danger_level * 0.5)))
+            Enemy.HP = Enemy.maxHP
+            print(f"The boss {Enemy.name} appears!")
+            Enemy.make_enemy_move()  
+        else:
+            Enemy = copy.deepcopy(random.choice(floor1_enemies))
+            Enemy.maxHP = round(Enemy.maxHP*(1 + (Player.current_node.danger_level * 0.05)))
+            Enemy.HP = Enemy.maxHP
+            print(f"A wild {Enemy.name} appears!")
+            Enemy.make_enemy_move()
+
         
 
     def kill_enemy(self):
         global turn_count
         global Enemy
+        global Player
+        global is_boss_fight
+
         if Enemy.HP <= 0:
             Enemy.alive = False
             print(f"{Enemy.name} has been defeated! A new enemy approaches!")
             game.start_new_card_selection()
-            game.assign_new_enemy()
             game.end_turn()
             turn_count = 0
+
+            money_earned = random.randint(1, 10) + (Player.current_node.danger_level * 2)
+            Player.money += money_earned
+            print(f"{Player.name} earned {money_earned} money! Total money: {Player.money}")
+
+            if is_boss_fight:
+                print("Boss defeated! You (kinda) win the game! Get ready for round 2, I guess. God this game is so bad.")
+                prepare_map() #restart the map for now
+                is_boss_fight = False
+                Player.money += 50 #big money reward for beating the boss
+        
 
 
     def apply_status_effects(self):
@@ -455,6 +515,23 @@ class gameloop:
             Enemy.status_effects["blind"] -= 1
             if Enemy.status_effects["blind"] <= 0:
                 del Enemy.status_effects["blind"]
+
+                
+
+        if "energised" in Player.status_effects:
+            Player.Energy += Player.status_effects["energised"]
+            print(f"{Player.name} is energised and gains {Player.status_effects['energised']} extra energy this turn!")
+            del Player.status_effects["energised"]
+
+        if "explosive" in Enemy.status_effects:
+            Enemy.status_effects["explosive"] -= 1
+            Enemy.block += Enemy.status_effects["explosive"] * 2
+            print(f"{Enemy.name} gains {Enemy.status_effects['explosive'] * 2} block from being explosive!")
+            if Enemy.status_effects["explosive"] <= 0:
+                print(f"{Enemy.name} explodes!")
+                Enemy.HP = 0
+                game.kill_enemy()
+                del Enemy.status_effects["explosive"]
 
 
 
@@ -491,12 +568,29 @@ class gameloop:
             elif force_map.collidepoint(event.pos):
                 print()
                 print("Force Map button clicked!")
-                map_generation.prepare_map()
+                game_states.prepare_map()
 
             elif force_rest.collidepoint(event.pos):
                 print()
                 print("Force Rest button clicked!")
                 game_state = "rest"
+
+            elif exit_button.collidepoint(event.pos):
+                print()
+                print("Exit button clicked!")
+                pygame.quit()
+                sys.exit()
+            
+            elif gimme_money.collidepoint(event.pos):
+                print()
+                print("Gimme Money button clicked!")
+                Player.money += 10
+                print(f"Player money: {Player.money}")
+
+            elif force_shop.collidepoint(event.pos):
+                print()
+                print("Force Shop button clicked!")
+                game_states.prepare_shop()
                 
             
             for i, card in enumerate(hand):
@@ -511,6 +605,7 @@ class gameloop:
                     print(f"Played {card}. New hand: {hand}")
                     print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
                     break  # Exit loop after playing one card
+        
 
 
 
@@ -528,15 +623,17 @@ class gameloop:
         Player.block = 0
         Enemy.block = 0
 
+        Player.Energy = Player.MaxEnergy
+
+        game.apply_status_effects()
+
         Player.take_damage() 
 
         Enemy.make_enemy_move()
 
-        Player.Energy = Player.MaxEnergy
-        if "energised" in Player.status_effects:
-            Player.Energy += Player.status_effects["energised"]
-            print(f"{Player.name} is energised and gains {Player.status_effects['energised']} extra energy this turn!")
-            del Player.status_effects["energised"]
+        Player.take_damage() 
+
+        Enemy.make_enemy_move()
 
 
         Player.make_hand()
@@ -561,11 +658,11 @@ class gameloop:
         global current_choices
 
         for i, card in enumerate(current_choices):
-            pygame.draw.rect(screen, (255, 255, 255), (200 + i * 200, 300, 150, 50))
+            pygame.draw.rect(vscreen, (255, 255, 255), (200 + i * 200, 300, 150, 50))
             font = pygame.font.SysFont(None, 24)
             text_surface = font.render(card.name, True, (0, 0, 0))
             text_rect = text_surface.get_rect(center=(200 + i * 200 + 75, 300 + 25))
-            screen.blit(text_surface, text_rect)
+            vscreen.blit(text_surface, text_rect)
 
 
     def handle_choice_new_card(self):
@@ -577,14 +674,39 @@ class gameloop:
                     chosen_card = current_choices[i]
                     Player.pool.append(chosen_card)
                     print(f"You chose {chosen_card.name} to add to your pool!")
-                    map_generation.prepare_map()
+                    game_states.prepare_map()
                     return
+
+    def draw_settings(self):
+        vscreen.blit(settings_grey_out, (0, 0))  # Greyed out background
+        pygame.draw.rect(vscreen, (200, 0, 0), quit_from_settings)  # Red quit button
+        font = pygame.font.SysFont(None, 36)
+        text_surface = font.render("Quit game", True, (255, 255, 255))
+        vscreen.blit(text_surface, (1200, 720))  # Centered text on the button
+
+    def handle_settings(self):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if quit_from_settings.collidepoint(event.pos):
+                print("Quitting game from settings...")
+                pygame.quit()
+                sys.exit()
+    
+    def go_to_settings(self):
+        global settings
+        if event.type == pygame.KEYDOWN:
+            if settings == False:
+                if event.key == pygame.K_ESCAPE:
+                    settings = True
+            else:
+                if event.key == pygame.K_ESCAPE:
+                    settings = False
+
 
     def start_game(self):
         None
     
 
-#--------------------------- Generate Map ---------------------------
+#--------------------------- Generate Map and stuff (mostly drawing different states) ----------------------------------------------------------------
 
 
 class node_generation_or_something_idk:
@@ -698,7 +820,7 @@ class node_generation_or_something_idk:
        if self.encounter_type == "enemy":
             self.danger_level = self.layer * 1
             if random.random() < 0.2:  # 20% chance to increase danger level
-                self.danger_level += 3
+                self.danger_level = self.danger_level*1.2 + 2
                 self.escpecially_dangerous = True
 
 
@@ -717,54 +839,54 @@ class node_generation_or_something_idk:
                 
                 # Draw connections
                 for target in node.connections:
-                    pygame.draw.line(screen, (255, 255, 255), (node.node_x, node.node_y), (target.node_x, target.node_y), 2) # white , width 2
+                    pygame.draw.line(vscreen, (255, 255, 255), (node.node_x, node.node_y), (target.node_x, target.node_y), 2) # white , width 2
                     #I have literally no idea why this works. And I mean LITERALLY no idea. But it does. Like, what the hell is even "target"???
                     # Nevermind, I am just sleep deprived. It's extremely obvious what target is. I am an idiot.
 
 
                 if node.encounter_type == "start":
-                    pygame.draw.circle(screen, (0, 255, 0), (node.node_x, node.node_y), 30)  # Green for start
+                    pygame.draw.circle(vscreen, (0, 255, 0), (node.node_x, node.node_y), 30)  # Green for start
                     font = pygame.font.SysFont(None, 24)
                     text_surface = font.render(node.encounter_type, True, (0, 0, 0))
                     text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    screen.blit(text_surface, text_rect)
+                    vscreen.blit(text_surface, text_rect)
 
 
                 elif node.encounter_type == "boss":
-                    pygame.draw.circle(screen, (255, 0, 0), (node.node_x, node.node_y), 30)  # Red for boss
+                    pygame.draw.circle(vscreen, (255, 0, 0), (node.node_x, node.node_y), 30)  # Red for boss
                     font = pygame.font.SysFont(None, 24)
                     text_surface = font.render(node.encounter_type, True, (0, 0, 0))
                     text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    screen.blit(text_surface, text_rect)
+                    vscreen.blit(text_surface, text_rect)
 
                 elif node.encounter_type == "enemy":
                     if node.escpecially_dangerous == False:
-                        pygame.draw.circle(screen, (255, 255, 255), (node.node_x, node.node_y), 30) # red, green, blue - x, y - radius
+                        pygame.draw.circle(vscreen, (255, 255, 255), (node.node_x, node.node_y), 30) # red, green, blue - x, y - radius
                     else:
-                        pygame.draw.circle(screen, (255, 0, 255), (node.node_x, node.node_y), 30) # magenta for especially dangerous enemies
+                        pygame.draw.circle(vscreen, (255, 0, 255), (node.node_x, node.node_y), 30) # magenta for especially dangerous enemies
                     font = pygame.font.SysFont(None, 15) # default font, size 15
                     text_surface = font.render(f"{node.encounter_type} {node.layer}, {node.layer_index}", True, (0, 0, 0))
                     text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    screen.blit(text_surface, text_rect)
+                    vscreen.blit(text_surface, text_rect)
 
                 elif node.encounter_type == "rest":
-                    pygame.draw.circle(screen, (210, 180, 140), (node.node_x, node.node_y), 30)  # Brown for rest
+                    pygame.draw.circle(vscreen, (210, 180, 140), (node.node_x, node.node_y), 30)  # Brown for rest
                     font = pygame.font.SysFont(None, 15) # default font, size 15
                     text_surface = font.render(f"{node.encounter_type} {node.layer}, {node.layer_index}", True, (255, 255, 255))
                     text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    screen.blit(text_surface, text_rect)    
+                    vscreen.blit(text_surface, text_rect)    
 
                
 
                 else:
-                    pygame.draw.circle(screen, (255, 255, 255), (node.node_x, node.node_y), 30) # red, green, blue - x, y - radius
+                    pygame.draw.circle(vscreen, (255, 255, 255), (node.node_x, node.node_y), 30) # red, green, blue - x, y - radius
                     font = pygame.font.SysFont(None, 15) # default font, size 15
                     text_surface = font.render(f"{node.encounter_type} {node.layer}, {node.layer_index}", True, (0, 0, 0))
                     text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    screen.blit(text_surface, text_rect)
+                    vscreen.blit(text_surface, text_rect)
 
                 if node is Player.current_node: # if the node and the player's current node are the same
-                    pygame.draw.circle(screen, (255, 215, 0), (node.node_x, node.node_y), 35, 3)  # highlighted with yellow
+                    pygame.draw.circle(vscreen, (255, 215, 0), (node.node_x, node.node_y), 35, 3)  # highlighted with yellow
         
     def handle_map_logic(self):
         global game_state
@@ -786,14 +908,10 @@ class node_generation_or_something_idk:
 
                             print(f"Moving to node: {node}")
                             Player.current_node = node
-                            if node.encounter_type == "enemy":
+                            if node.encounter_type == "enemy" or node.encounter_type == "boss": #assigning a boss is handled in assign_new_enemy
                                 game.assign_new_enemy()
                                 Player.make_hand()
                                 game_state = "fight"
-
-                            elif node.encounter_type == "boss":
-                                print("I don't have boss yer, sorry")
-                                print("I guess you win?")
                             
                             elif node.encounter_type == "rest":
                                 game_state = "rest"
@@ -811,26 +929,26 @@ class node_generation_or_something_idk:
         x = round(x)
 
 
-        pygame.draw.rect(screen, (0, 255, 0), (500, 500, 400, 100))  # Big green heal button
+        pygame.draw.rect(vscreen, (0, 255, 0), (500, 500, 400, 100))  # Big green heal button
         font = pygame.font.SysFont(None, 36)
         text_surface = font.render(f"heal for 20% of max HP({x})", True, (0, 0, 0))  # Black text
         text_rect = text_surface.get_rect(center=(700, 540))
-        screen.blit(text_surface, text_rect)
+        vscreen.blit(text_surface, text_rect)
 
-        pygame.draw.rect(screen, (255, 255, 255), (600, 650, 200, 80))  # White continue button
+        pygame.draw.rect(vscreen, (255, 255, 255), (600, 650, 200, 80))  # White continue button
         text_surface = font.render("continue", True, (0, 0, 0))  # Black text
         text_rect = text_surface.get_rect(center=(700, 690))
-        screen.blit(text_surface, text_rect)
+        vscreen.blit(text_surface, text_rect)
 
-        pygame.draw.rect(screen, (0, 128, 255), (0, 0, 800, 40))  # blue player info button
+        pygame.draw.rect(vscreen, (0, 128, 255), (0, 0, 800, 40))  # blue player info button
         font = pygame.font.SysFont(None, 20)
         text_surface = font.render(f"{Player}", True, (255, 255, 255))  # White text
-        screen.blit(text_surface, (10, 10))
+        vscreen.blit(text_surface, (10, 10))
 
-        pygame.draw.rect(screen, (255, 255, 255), (550, 800, 300, 50))  # White upgrade button - so far not implemented
+        pygame.draw.rect(vscreen, (255, 255, 255), (550, 800, 300, 50))  # White upgrade button - so far not implemented
         font = pygame.font.SysFont(None, 18)
         text_surface = font.render("Upgrade- PLACEHOLDER, NOT IMPLEMENTED", True, (0, 0, 0))  # black text
-        screen.blit(text_surface, (560, 810))
+        vscreen.blit(text_surface, (560, 810))
 
 
     def handle_rest_logic(self):
@@ -859,26 +977,113 @@ class node_generation_or_something_idk:
                     game_state = "map"
                     rest_done = False
 
-map_generation = node_generation_or_something_idk(layer=0, layer_index=0, encounter_type="start")
 
 
 
-layers = map_generation.generate_layers(layer_width=4, layer_depth=8)
-layers = map_generation.connect_layers(layers)
+    def prepare_shop(self): # only once per shop visit, makes inventory
+        global shop_offers
+        global game_state
 
-Player.current_node = layers[0][0]  # start at the start node
+        shop_offers = random.sample(floor1_loot, 5)
 
-# Assign positions and danger levels to all nodes
-for layer in layers:
-    for node in layer:
-        node.assign_node_positions()
-        node.assign_node_danger_level()
+        game_state = "shop"
 
-print("Generated Encounter Map:")
-for layer in layers:
-    for node in layer:
-        connections = [f"Layer {n.layer} Index {n.layer_index}" for n in node.connections]
-        print(f"Node (Layer {node.layer}, Index {node.layer_index}, Type: {node.encounter_type}) -> Connections: {connections}")
+
+
+    def draw_shop(self):
+        
+        for i, card in enumerate(shop_offers):
+            pygame.draw.rect(vscreen, (255, 255, 255), (150*2 + i * 130*2, 300*2, 120*2, 50*2)) # same as draw hand but multiplied by 2 to make it bigger, I guess it's less efficient but it's easier to implement and won't even end up in the final game, I hope
+            font = pygame.font.SysFont(None, 24)
+            text_surface = font.render(f"{card.name} - 10$", True, (0, 0, 0))
+            text_rect = text_surface.get_rect(center=(150*2 + i * 130*2 + 60*2, 300*2 + 25*2))
+            vscreen.blit(text_surface, text_rect)
+
+        pygame.draw.rect(vscreen, (0, 255, 0), (1280 - 200, 900, 400, 150))  # buy medical supplies button
+        font = pygame.font.SysFont(None, 32)
+        text_surface = font.render(f"buy medical supplies (plus 20% HP {round(Player.maxHP * 0.2)}) - 10$", True, (255, 255, 255))  # white text
+        text_rect = text_surface.get_rect(center=(1280 - 200 + 200, 900 + 75))
+        vscreen.blit(text_surface, text_rect)
+
+        pygame.draw.rect(vscreen, (255, 255, 255), (1280 - 200, 1100, 400, 80))  # continue button
+        font = pygame.font.SysFont(None, 36)
+        text_surface = font.render("Continue", True, (0, 0, 0))
+        text_rect = text_surface.get_rect(center=(1280 - 200 + 200, 1100 + 40))
+        vscreen.blit(text_surface, text_rect)
+
+        pygame.draw.rect(vscreen, (0, 128, 255), (0, 0, 800, 40))  # blue player info button
+        font = pygame.font.SysFont(None, 20)
+        text_surface = font.render(f"{Player}", True, (255, 255, 255))  # White text
+        vscreen.blit(text_surface, (10, 10))
+
+    def handle_shop_logic(self):
+        global game_state
+        global Player
+        global cost_of_cards
+        global cost_of_supplies
+
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            for i, card in enumerate(shop_offers):
+                card_rect = pygame.Rect(150*2 + i * 130*2, 300*2, 120*2, 50*2) 
+                if card_rect.collidepoint(event.pos):
+                    if Player.money >= cost_of_cards:
+                        Player.pool.append(card) # append means add
+                        Player.money -= cost_of_cards
+                        print(f"Purchased {card.name} for {cost_of_cards}$. Remaining money: {Player.money}")
+                    else:
+                        print("Not enough money to purchase this card.")
+
+            buy_supplies_rect = pygame.Rect(1280 - 200, 900, 400, 150)
+            continue_rect = pygame.Rect(1280 - 200, 1100, 400, 80)
+
+            if buy_supplies_rect.collidepoint(event.pos):
+    
+                if Player.money >= cost_of_supplies:
+                    Player.money -= cost_of_supplies
+                    heal_amount = round(Player.maxHP * 0.2)
+                    Player.HP += heal_amount
+                    if Player.HP > Player.maxHP:
+                        Player.HP = Player.maxHP
+                    print(f"Purchased medical supplies for {cost_of_supplies}$. Healed for {heal_amount} HP. Current HP: {Player.HP}. Remaining money: {Player.money}")
+                else:
+                    print("Not enough money to buy medical supplies.")
+
+            elif continue_rect.collidepoint(event.pos):
+                print("Leaving the shop and continuing the journey...")
+                game_state = "map"
+
+    
+
+
+
+
+game_states = node_generation_or_something_idk(layer=0, layer_index=0, encounter_type="start")
+
+
+def prepare_map():
+    global layers
+        
+
+    layers = game_states.generate_layers(layer_width=4, layer_depth=8)
+    layers = game_states.connect_layers(layers)
+
+    Player.current_node = layers[0][0]  # start at the start node
+
+    # Assign positions and danger levels to all nodes
+    for layer in layers:
+        for node in layer:
+            node.assign_node_positions()
+            node.assign_node_danger_level()
+
+    print("Generated Encounter Map:")
+    for layer in layers:
+        for node in layer:
+            connections = [f"Layer {n.layer} Index {n.layer_index}" for n in node.connections]
+            print(f"Node (Layer {node.layer}, Index {node.layer_index}, Type: {node.encounter_type}) -> Connections: {connections}")
+
+
+prepare_map() #sets it up for the first time
     
 game = gameloop(Player, Enemy)
 
@@ -886,13 +1091,11 @@ game = gameloop(Player, Enemy)
 
 
 
-Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", 3, 5)
+Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", {}, 3, 5)
 Player = copy.deepcopy(Kori)
 Player.current_node = layers[0][0]
 
 
-Enemy = copy.deepcopy(Joe)
-floor1_enemies = [Joe, Construct, Repair_Man, Thug]
 
 
 
@@ -924,31 +1127,43 @@ choose_new_card_square = pygame.Rect(600, 980, 200, 80)
 # Bottom-left force map and rest buttons, 1 pixel apart
 force_map = pygame.Rect(1250, 959, 150, 80)
 force_rest = pygame.Rect(1250, 1040, 150, 80)
+force_shop = pygame.Rect(1250, 1121, 150, 80)
 
-Eror_screen = pygame.Rect(0, 0, 1400, 1120)
+gimme_money = pygame.Rect(1250, 1121 + 81, 150, 80)
+
+
+exit_button = pygame.Rect(1300, 20, 80, 40)
+
+money_square = pygame.Rect(50, 0, 200, 60)
+
+Eror_screen = pygame.Rect(0, 0, 9999, 9999)
 
 
 Player.make_hand()
 
 
 def basic_draw_fight():
-    game.draw_button(screen, player_square, Player.__repr__())
-    game.draw_button(screen, enemy_square, Enemy.__repr__())
-    game.draw_button(screen, player_attack_square, "Player Attack")    
-    game.draw_button(screen, enemy_attack_square, "Enemy Attack")
-    game.draw_button(screen, resolve_square, "Resolve Damage")
-    game.draw_button(screen, end_turn_square, "End Turn")
-    game.draw_hand(screen, hand, hand_start_x, hand_start_y, end_x, hand_card_width, hand_card_height)
-    game.draw_button(screen, enemy_intent, f"Enemy Intent: {Enemy.enemy_move if hasattr(Enemy, 'enemy_move') else 'None'}")
-    game.draw_button(screen, turn_count_square, f"Turn: {turn_count}")
-    game.draw_button(screen, choose_new_card_square, "Choose New Card")
-    game.draw_button(screen, enemy_status_square, f"Enemy Status: {Enemy.status_effects}")
-    game.draw_button(screen, player_status_square, f"Player Status: {Player.status_effects}")
-    game.draw_button(screen, force_map, "Force Map")
-    game.draw_button(screen, force_rest, "Force Rest")
+    game.draw_button(vscreen, player_square, Player.__repr__())
+    game.draw_button(vscreen, enemy_square, Enemy.__repr__())
+    game.draw_button(vscreen, player_attack_square, "Player Attack")    
+    game.draw_button(vscreen, enemy_attack_square, "Enemy Attack")
+    game.draw_button(vscreen, resolve_square, "Resolve Damage")
+    game.draw_button(vscreen, end_turn_square, "End Turn")
+    game.draw_hand(vscreen, hand, hand_start_x, hand_start_y, end_x, hand_card_width, hand_card_height)
+    game.draw_button(vscreen, enemy_intent, f"Enemy Intent: {Enemy.enemy_move if hasattr(Enemy, 'enemy_move') else 'None'}")
+    game.draw_button(vscreen, turn_count_square, f"Turn: {turn_count}")
+    game.draw_button(vscreen, choose_new_card_square, "Choose New Card")
+    game.draw_button(vscreen, enemy_status_square, f"Enemy Status: {Enemy.status_effects}")
+    game.draw_button(vscreen, player_status_square, f"Player Status: {Player.status_effects}")
+    game.draw_button(vscreen, force_map, "Force Map")
+    game.draw_button(vscreen, force_rest, "Force Rest")
+    game.draw_button(vscreen, exit_button, "X")
+    game.draw_button(vscreen, money_square, f"Money: {Player.money}")
+    game.draw_button(vscreen, gimme_money, "Gimme 10 Money")
+    game.draw_button(vscreen, force_shop, "Force Shop")
 
 def draw_error_screen():
-    game.draw_button(screen, Eror_screen, "ERROR: Invalid Game State")
+    game.draw_button(vscreen, Eror_screen, "ERROR: Invalid Game State")
 
 hand_start_x = 200
 hand_start_y = 500
@@ -964,7 +1179,7 @@ enemy_move = Enemy.make_enemy_move()
 #------------------------------- Main Pygame Loop -------------------------------
 
 while True:
-    screen.fill((0, 0, 0))
+    vscreen.fill((0, 0, 0))
 
     if game_state == "fight":
         basic_draw_fight()
@@ -973,14 +1188,22 @@ while True:
         game.make_choice_new_card()
 
     elif game_state == "map":
-        map_generation.draw_map()
+        game_states.draw_map()
 
     elif game_state == "rest":
-        map_generation.draw_rest()
+        game_states.draw_rest()
+
+    elif game_state == "shop":
+        game_states.draw_shop()
 
     else:
         draw_error_screen()
-        
+
+
+    
+    if settings == True:
+        game.draw_settings()
+
         
 
 
@@ -991,22 +1214,34 @@ while True:
             pygame.quit()
             sys.exit()
 
+        game.go_to_settings()
+
+
+
         if game_state == "fight":
             game.handle_basic_logic()
-        
 
-        if game_state == "choose_new_card":
+        elif game_state == "choose_new_card":
             game.handle_choice_new_card()
         
-        if game_state == "map":
-            map_generation.handle_map_logic()
+        elif game_state == "map":
+            game_states.handle_map_logic()
         
-        if game_state == "rest":
-            map_generation.handle_rest_logic()
+        elif game_state == "rest":
+            game_states.handle_rest_logic()
+        
+        elif game_state == "shop":
+            game_states.handle_shop_logic()
+
+
+        
+        if settings == True:
+            game.handle_settings()
 
 
 
 
-
+    scaled = pygame.transform.scale(vscreen, rscreen.get_size())
+    rscreen.blit(scaled, (0, 0))
     pygame.display.flip()
     clock.tick(60)
