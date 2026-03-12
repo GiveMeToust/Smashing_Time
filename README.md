@@ -13,7 +13,6 @@ Mým hlavním cílem je vytvořit v 2D karetní bojovou hru Pythonu s použitím
 > - Implementaci alespoň 5 různých nepřátel se specifickým chováním a vizuálem
 > - Vytvoření uživatelského rozhraní (menu, ukazatele životů, energie, výběr karet)
 > - Vytvoření a integrace grafických prvků (pozadí, karty, ikony, postavy) - poskytnuté Adelou Vokrouhlíkovou
-> - Vytvoření a zakomponování příběhu pomocí krátkých textových dialogů
 
 
 
@@ -29,6 +28,7 @@ Mým hlavním cílem je vytvořit v 2D karetní bojovou hru Pythonu s použitím
 >**Do odevzdání (do 1.4.):**
 > Donkončení uživatelského horzhraní a vyladění detailu.
 > Dokončení dokumentace.
+
 
 
 
