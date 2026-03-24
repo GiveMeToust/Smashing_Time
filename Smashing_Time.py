@@ -4,11 +4,97 @@ from tkinter import font
 import copy
 import pygame
 import sys
-
-
+import os
 
 pygame.init()
 
+
+#     Loading assets here:
+
+Images = {}  # Dictionary to hold loaded images
+
+BASE_DIR = os.path.dirname(__file__)
+ART_ASSETS_DIR = os.path.join(BASE_DIR, "Art_Assets")
+
+def Load_Image(file_name): #a function to load images so that I don't always point at their file name but actually have them as a surface  
+    full_path = os.path.join(ART_ASSETS_DIR, file_name)
+    # Check existence first to provide a clear error and avoid crashing
+    if not os.path.exists(full_path):
+        print(f"Image not found: {full_path}")
+        return None
+
+    try:
+        image = pygame.image.load(full_path)  # loads image, returns a Surface
+        print(f"Successfully loaded image '{file_name}'")
+        Images[file_name] = image  # Store the loaded image in the dictionary "Images" with the file name as the key
+    
+    except Exception as e:
+        # Catch broader exceptions (including FileNotFoundError and pygame errors)
+        print(f"Error loading image '{file_name}': {e}")
+        return None
+
+List_of_cards = [       # A list of all cards  
+    "Defend.jpg",
+    "Concentrate.jpeg", # for some reason when I coppied it from my phone it came out as jpg but also jpeg when I did it on my computer, both were from the same source so that's fun I guess
+    "Deck_Out.jpg",
+    "Enrage.jpg",
+    "Fury.jpg",
+    "Gamble.jpg",
+    "Glare.jpeg",
+    "Poison_Bomb.jpg",
+    "Poison_Strike.jpg",
+    "Pray.jpg",
+    "SMASH!.jpg",
+    "Smash.jpg",
+    "Smite.jpg",
+]
+
+List_of_backrounds = [
+    "Battle_Background.png",
+]
+
+List_of_characters = [
+    "Joe.png", # This guy is a stock photo that I did NOT pay for and I don't care. Sue me. 
+    "Kori.png",
+    "Repair_Man.png",
+    "Extremely_Sucpicious_Barell.png",
+    "Thug.png",
+    "Construct.png",
+]
+
+#loading all images:
+
+for image_name in List_of_cards:
+    Load_Image(image_name)
+
+for image_name in List_of_characters:
+    Load_Image(image_name)
+
+for image_name in List_of_backrounds:
+    Load_Image(image_name)
+
+#transforming images sizes:
+
+def transform_images(image_name, scale_factor):
+    x , y = Images[image_name].get_size()
+    Images[image_name] = pygame.transform.scale(Images[image_name], (x * scale_factor, y * scale_factor))
+
+for character in List_of_characters:
+    transform_images(character, 0.70)
+
+for card in List_of_cards:
+    if card == "Poison_Strike.jpg" or card == "Enrage.jpg": #these cards have different resolutions for some reason, I don't know why
+        transform_images(card, 0.1925) #compleately eyeballed it, but it looks identical to the other cards. If it's stupid but works, it's not stupid.
+    else:
+        transform_images(card, 0.15)
+
+for background in List_of_backrounds:
+    transform_images(background, 1)
+
+#
+
+
+my_font = pygame.font.SysFont("Verdana", 36)  # 36 px Verdana
 
 VIRTUAL_SIZE = (2560, 1440)
 rscreen = pygame.display.set_mode((0, 0), pygame.RESIZABLE)  #this is the real screen that gets resized and actually shown (x,y) means starting dimiensions, 0,0 means full screen
@@ -27,20 +113,20 @@ dramatic_pause = False #flag for dramatic pause before you get forwarded to an e
 dramatic_pause_timer = 1.5  # seconds
 
 
-
+dev_mode = False # turns on shitty looking mode
 hand = []
 turn_count =  1
-game_state = "fight"
+game_state = "dev_figth"
 settings =  False
 rest_done = False
 is_boss_fight = False #flag for if current fight is a boss fight, mostly used so you get a new map after beating a boss
 
 print("hello world")
 
-attack="attack"  #toying with the idea of defining move types as variables instead of strings
-defend="defend"  #"Feeling like programing well, might delete later"
-STR_up="STR-up"  
-DEF_up="DEF-up" 
+attack="ATK"  #toying with the idea of defining move types as variables instead of strings
+defend="DEF"  #"Feeling like programing well, might delete later"
+STR_up="STRup"  
+DEF_up="DEFup" 
 
 
 
@@ -50,93 +136,96 @@ settings_grey_out.fill((0, 0, 0))  # Black color
 settings_grey_out.set_alpha(128)  # Set transparency level (0-255)
 
 quit_from_settings = pygame.Rect(1180, 700, 200, 100)  # x, y, width, height
+settings_dev_mode_toggle = pygame.Rect(1180, 850, 200, 100)  # x, y, width, height
 
 cost_of_cards = 30 
 cost_of_supplies = 20
 
 class move:
-    def __init__(self, name, power, type, cost, tags):
+    def __init__(self, name, image_name, power, type, cost, tags):
         self.name = name
+        self.image_name = image_name
         self.power = power
         self.type = type
         self.cost = cost
         self.tags = tags
+        
+
 
     def __repr__(self):
-        return f"{self.name} (type: {self.type}, power: {self.power}, cost: {self.cost}, tags: {self.tags})"
-
+        return f"{self.name} (type: {self.type}, power: {self.power}, cost: {self.cost}, tags: {self.tags}, image: {self.image_name})"
 
 Kori_pool = [
-    move("Smash", 10, "attack", 1, tags={}),
-    move("Smash", 10, "attack", 1, tags={}),
-    move("Smash", 10, "attack", 1, tags={}),
-    move("Defend", 10, "defend", 1, tags={}),
-    move("Defend", 10, "defend", 1, tags={}),
-    move("Defend", 10, "defend", 1, tags={}),
-    move("SMASH!", 25, "attack", 2, tags={}),
-    move("Enrage", 5, "STR-up", 1, tags={"enrage": None}),
-    move("Gamble", 0, "spell", 1, tags={"redraw": True}),
-    move("Deck out", 7, "defend", 1, tags={"draw": 2}),
-    move("poison strike", 7, "attack", 1, tags={"poison": 3}),
+    move("Smash", "Smash.jpg", 10, "ATK", 1, tags={}),
+    move("Smash", "Smash.jpg", 10, "ATK", 1, tags={}),
+    move("Smash", "Smash.jpg", 10, "ATK", 1, tags={}),
+    move("DEF", "Defend.jpg", 10, "DEF", 1, tags={}),
+    move("DEF", "Defend.jpg", 10, "DEF", 1, tags={}),
+    move("DEF", "Defend.jpg", 10, "DEF", 1, tags={}),
+    move("SMASH!", "SMASH!.jpg", 25, "ATK", 2, tags={}),
+    move("Enrage", "Enrage.jpg", 5, "STRup", 1, tags={"enrage": None}),
+    move("Gamble", "Gamble.jpg", 0, "spell", 1, tags={"redraw": True}),
+    move("Deck Out", "Deck_Out.jpg", 7, "DEF", 1, tags={"draw": 2}),
+    move("Poison Strike", "Poison_Strike.jpg", 7, "ATK", 1, tags={"poison": 3}),
 ]
 
 
 Joe_pool = [
-    move("punch", 15, "attack", 999,  tags={}),
-    move("punch", 15, "attack", 999,  tags={}),
-    move("cower", 20, "defend", 999,  tags={}),
-    move("cower", 20, "defend", 999,  tags={}),
-    move("Calm breath", 5, "DEF-up", 999,  tags={})
+    move("punch", "", 15, "ATK", 999,  tags={}),
+    move("punch", "", 15, "ATK", 999,  tags={}),
+    move("cower", "", 20, "DEF", 999,  tags={}),
+    move("cower", "", 20, "DEF", 999,  tags={}),
+    move("Calm breath", "", 5, "DEFup", 999,  tags={})
 ]
 
 Construct_pool = [
-    move("slam", 30, "attack", 999,  tags={}),
-    move("fortify", 30, "defend", 999,  tags={}),
-    move("construct", 10, "STR-up", 999,  tags={})
+    move("slam", "", 30, "ATK", 999,  tags={}),
+    move("fortify", "", 30, "DEF", 999,  tags={}),
+    move("construct", "", 10, "STRup", 999,  tags={})
 ]
 
 Thug_pool = [
-    move("poison strike", 10, "attack", 999, tags={"poison": 3}),
-    move("smoke screen", 10, "defend", 999, tags={"blind": 1}),
-    move("slash", 5, "attack", 999, tags={"multihit": 4}),
+    move("Poison Strike", "", 10, "ATK", 999, tags={"poison": 3}),
+    move("Smoke Screen", "", 10, "DEF", 999, tags={"blind": 1}),
+    move("Slash", "", 5, "ATK", 999, tags={"multihit": 4}),
 ]
 
 Repair_Man_pool = [
-    move("weld", 20, "attack", 999, tags={}),
-    move("empty magazine", 3, "attack", 999, tags={"multihit": 6}),
-    move("brace", 20, "defend", 999, tags={}),
-    move("patch up", 20, "defend", 999, tags={"heal": 15}),
-    move("overclock", 10, "STR-up", 999, tags={}),
+    move("weld", "", 20, "ATK", 999, tags={}),
+    move("empty magazine", "", 3, "ATK", 999, tags={"multihit": 6}),
+    move("brace", "", 20, "DEF", 999, tags={}),
+    move("patch up", "", 20, "DEF", 999, tags={"heal": 15}),
+    move("overclock", "", 10, "STRup", 999, tags={}),
 ]
 
 Extremely_Sucpicious_Barell_pool = [
-    move("do nothing", 40, "defend", 999, tags={}),
-    move("do nothing", 40, "defend", 999, tags={}),
-    move("sucpicious sounds", 20, "attack", 999, tags={}),
+    move("do nothing", "", 40, "DEF", 999, tags={}),
+    move("do nothing", "", 40, "DEF", 999, tags={}),
+    move("sucpicious sounds", "", 20, "ATK", 999, tags={}),
 ]
 
-explode_move = move("explode", 9999, "attack", 0, tags={}) #that's a suprise tool that will help us later
-
+explode_move = move("explode", "", 9999, "ATK", 0, tags={}) #that's a suprise tool that will help us later
+                                                                #I think I forgot to actually use this suprise tool, I think I meant to have the barrel use it when it explodes
 floor1_loot = [
-    move("Smash", 10, "attack", 1, tags={}),
-    move("Block", 4, "defend", 0, tags={}),
-    move("Power Up", 5, "STR-up", 1, tags={}),
-    move("poison strike", 7, "attack", 1, tags={"poison": 3}), #damages enemy at the end of turn, then loses 1 poison
-    move("poison bomb", 2, "attack", 2, tags={"poison": 5}), 
-    move("Concentrate", 5, "DEF-up", 1, tags={}), 
-    move("Shrug off", 20, "defend", 1, tags={}),
-    move("Deck out", 7, "defend", 0, tags={"draw": 2}), #draw 2 cards
-    move("Gamble", 0, "spell", 0, tags={"redraw": True}), #you draw a new hand, can only be used once per turn so you can't spam zero cost moves
-    move("Smite" , 10, "attack", 1, tags={"blind": 2}), #makes enemy attacks do 75% damage
-    move("Fury" , 6 , "attack", 1, tags={"multihit": 2}), #attack twice
-    move("Glare", 5, "attack", 0, tags={"blind": 1}), #enemy attacks do 75% damage for x turns
-    move("pray", 5, "defend", 1, tags={"energised":1, }), #I thought about making it heal but that would promote delaying kills, which is not fun, now it gives you +1 energy next turn
+    move("Smash", "Smash.jpg", 10, "ATK", 1, tags={}), #
+  #  move("Block", "Block.jpg", 4, "DEF", 0, tags={}), # ---------------------------------- missing texture, messes up the code without it
+    move("Power Up", "Power_Up.jpg", 5, "STRup", 1, tags={}), #
+    move("Poison Strike", "Poison_Strike.jpg", 7, "ATK", 1, tags={"poison": 3}), ##damages enemy at the end of turn, then loses 1 poison
+    move("Poison Bomb", "Poison_Bomb.jpg", 2, "ATK", 2, tags={"poison": 5}), #
+    move("Concentrate", "Concentrate.jpg", 5, "DEFup", 1, tags={}), #
+    move("Shrug off", "Shrug_off.jpg", 20, "DEF", 1, tags={}),
+    move("Deck Out", "Deck_Out.jpg", 7, "DEF", 0, tags={"draw": 2}), ##draw 2 cards 
+    move("Gamble", "Gamble.jpg", 0, "spell", 0, tags={"redraw": True}), ##you draw a new hand, can only be used once per turn so you can't spam zero cost moves
+    move("Smite" , "Smite.jpg", 10, "ATK", 1, tags={"blind": 2}), ##makes enemy attacks do 75% damage
+    move("Fury" , "Fury.jpg", 6 , "ATK", 1, tags={"multihit": 2}), ##attack twice
+    move("Glare", "Glare.jpg", 5, "ATK", 0, tags={"blind": 1}), #enemy attacks do 75% damage for x turns
+    move("Pray", "Pray.jpg", 5, "DEF", 1, tags={"energised":1, }), #I thought about making it heal but that would promote delaying kills, which is not fun, now it gives you +1 energy next turn
 ]
 
 
 
 class champion:
-    def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects):
+    def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects, image_name):
         self.name = name
         self.maxHP = maxHP
         self.HP = maxHP
@@ -150,6 +239,7 @@ class champion:
         self.pool = pool
         self.poolname = poolname
         self.status_effects = status_effects # usually empty when created, a dictionary of status effects and their values or lack of therefore
+        self.image_name = image_name
 
     def __repr__(self):
         return f"{self.name} (maxHP: {self.maxHP}, HP: {self.HP}, STR: {self.STR}, DEF: {self.DEF}, pool: {self.poolname})"
@@ -158,8 +248,8 @@ class champion:
 
 
 class player(champion):
-    def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects, MaxEnergy, drawNum,):
-        super().__init__(name, maxHP, STR, DEF, pool, poolname, status_effects)
+    def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects, image_name, MaxEnergy, drawNum,):
+        super().__init__(name, maxHP, STR, DEF, pool, poolname, status_effects, image_name)
         self.MaxEnergy = MaxEnergy
         self.Energy = MaxEnergy
         self.drawNum = drawNum
@@ -197,7 +287,7 @@ class player(champion):
                 break
         while multihit >= 1:
 
-            if move.type == "attack":
+            if move.type == "ATK":
                 if Enemy.alive == False:
                     print(f"{Enemy.name} is already dead! Talk about beating a dead horse.")
                     return
@@ -221,11 +311,11 @@ class player(champion):
                 x = ""
                 
 
-            elif move.type == "defend":
+            elif move.type == "DEF":
                 self.block += move.power + self.DEF
-            elif move.type == "STR-up":
+            elif move.type == "STRup":
                 self.STR += move.power
-            elif move.type == "DEF-up":
+            elif move.type == "DEFup":
                 self.DEF += move.power 
             elif move.type == "spell": #all these moves are handled by tags
                 pass
@@ -318,7 +408,7 @@ class player(champion):
 
             
 
-Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", {}, 3, 5)
+Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", {}, "Kori.png", 3, 5)
 Player = copy.deepcopy(Kori)
 
 
@@ -328,8 +418,8 @@ Player = copy.deepcopy(Kori)
 
 
 class foe(champion):
-    def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects):
-        super().__init__(name, maxHP, STR, DEF, pool, poolname, status_effects)  
+    def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects, image_name):
+        super().__init__(name, maxHP, STR, DEF, pool, poolname, status_effects, image_name)  
     
 
 
@@ -348,25 +438,28 @@ class foe(champion):
 
 
         while multihit >= 1:
-            if enemy_move.type == "attack": 
+            if enemy_move.type == "ATK": 
                 if "blind" in Player.status_effects:
                     x = (enemy_move.power + self.STR)*0.75
                     x = round(x)
                     Player.pending_damage += x
                 else:
                     Player.pending_damage += enemy_move.power + self.STR
-            elif enemy_move.type == "defend":
+            elif enemy_move.type == "DEF":
                 self.block += enemy_move.power + self.DEF
-            elif enemy_move.type == "STR-up":
+            elif enemy_move.type == "STRup":
                 self.STR += enemy_move.power
-            elif enemy_move.type == "DEF-up":
+            elif enemy_move.type == "DEFup":
                 self.DEF += enemy_move.power
             elif enemy_move.type == "spell": #all these moves are handled by tags
                 pass
 
             for tag, tag_value in enemy_move.tags.items():
                 if tag == "poison":
-                    Player.status_effects["poison"] += tag_value  
+                    if "poison" in Player.status_effects:
+                        Player.status_effects["poison"] += tag_value
+                    else:
+                        Player.status_effects["poison"] = tag_value
                     print(f"Poison stacked! Total poison damage: {Player.status_effects['poison']}")
                 elif tag == "blind":
                     if "blind" in Player.status_effects:
@@ -389,11 +482,11 @@ class foe(champion):
 
 
 
-Joe=foe("Joe", 50 + random.randint(-5, 5) , 0, 0, Joe_pool, "Joe pool", {})
-Construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool", {})
-Thug = foe("Thug", 80 + random.randint(-5, 5), 5 + random.randint(-1, 1), 0, Thug_pool, "Thug pool", {})
-Repair_Man = foe("Repair Man", 200, 0, 0, Repair_Man_pool, "Repair Man pool", {})
-Extremely_Sucpicious_Barell = foe("Extremely Sucpicious Barell", 80 + random.randint(-5, 5), 0, 0, Extremely_Sucpicious_Barell_pool, "Extremely Sucpicious Barell pool",  {"explosive": 5}) #explodes after x turns, gains 2*x block every turn
+Joe=foe("Joe", 50 + random.randint(-5, 5) , 0, 0, Joe_pool, "Joe pool", {}, "Joe.png")
+Construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool", {}, "Construct.png")
+Thug = foe("Thug", 80 + random.randint(-5, 5), 5 + random.randint(-1, 1), 0, Thug_pool, "Thug pool", {}, "Thug.png")
+Repair_Man = foe("Repair Man", 200, 0, 0, Repair_Man_pool, "Repair Man pool", {}, "Repair_Man.png")
+Extremely_Sucpicious_Barell = foe("Extremely Sucpicious Barell", 80 + random.randint(-5, 5), 0, 0, Extremely_Sucpicious_Barell_pool, "Extremely Sucpicious Barell pool",  {"explosive": 5}, "Extremely_Sucpicious_Barell.png") #explodes after x turns, gains 2*x block every turn
 Enemy = copy.deepcopy(Joe)
 
 floor1_enemies = [Joe, Construct, Thug, Extremely_Sucpicious_Barell]
@@ -429,7 +522,7 @@ class gameloop:
         vscreen.blit(text_surface, (button_rect.x + 10, button_rect.y + 10))
 
 
-    def draw_hand(self,vscreen, hand, start_x, start_y, end_x,  card_width, card_height):
+    def dev_draw_hand(self,vscreen, hand, start_x, start_y, end_x,  card_width, card_height):
 
         L = end_x - start_x
         
@@ -536,7 +629,7 @@ class gameloop:
 
 
 
-    def handle_basic_logic(self):
+    def dev_handle_basic_logic(self):
         global game_state
         if event.type == pygame.MOUSEBUTTONDOWN:
             if player_attack_square.collidepoint(event.pos):
@@ -594,7 +687,7 @@ class gameloop:
                 
             
             for i, card in enumerate(hand):
-                # Calculate spacing exactly like draw_hand so the clickable rect matches drawn position
+                # Calculate spacing exactly like dev_draw_hand so the clickable rect matches drawn position
                 spacing = (end_x - hand_start_x - len(hand) * hand_card_width) / (len(hand) + 1) if (len(hand) + 1) > 0 else 0
                 card_x = hand_start_x + i * (hand_card_width + spacing)
                 card_rect = pygame.Rect(card_x, hand_start_y, hand_card_width, hand_card_height)
@@ -680,16 +773,37 @@ class gameloop:
     def draw_settings(self):
         vscreen.blit(settings_grey_out, (0, 0))  # Greyed out background
         pygame.draw.rect(vscreen, (200, 0, 0), quit_from_settings)  # Red quit button
-        font = pygame.font.SysFont(None, 36)
+
+        font = pygame.font.SysFont(None, 33)
         text_surface = font.render("Quit game", True, (255, 255, 255))
-        vscreen.blit(text_surface, (1200, 720))  # Centered text on the button
+        vscreen.blit(text_surface, (1190, 720))  # Centered text on the button
+
+        pygame.draw.rect(vscreen, (200, 200, 200), settings_dev_mode_toggle)  # Grey toggle button
+        text_surface = font.render("Dev Mode: " + str(dev_mode), True, (0, 0, 0))
+        vscreen.blit(text_surface, (1190, 890))  # Centered text on the toggle button
+
 
     def handle_settings(self):
+        global dev_mode
+        global game_state
         if event.type == pygame.MOUSEBUTTONDOWN:
             if quit_from_settings.collidepoint(event.pos):
                 print("Quitting game from settings...")
                 pygame.quit()
                 sys.exit()
+                
+            elif settings_dev_mode_toggle.collidepoint(event.pos):
+                dev_mode = not dev_mode
+
+                if game_state == "dev_figth": #flips fight and dev_fight
+                    game_state = "fight"
+                elif game_state == "fight":
+                    game_state = "dev_figth"   
+
+                print(f"Dev Mode toggled to {dev_mode}!")
+                print(f"Game state is now: {game_state}")
+
+
     
     def go_to_settings(self):
         global settings
@@ -887,7 +1001,125 @@ class node_generation_or_something_idk:
 
                 if node is Player.current_node: # if the node and the player's current node are the same
                     pygame.draw.circle(vscreen, (255, 215, 0), (node.node_x, node.node_y), 35, 3)  # highlighted with yellow
+
+    def draw_hand(self,vscreen, hand, start_x, start_y, end_x,  card_width): # reused from dev_draw_hand, that's why there is card_width even though I don't set it. Think of it like a the way to do spacing
+
+        L = end_x - start_x
         
+        spacing = (L - len(hand)*card_width) / (len(hand) + 1)
+
+        for i, card in enumerate(hand):
+            my_font = pygame.font.SysFont("Verdana", 36)  # 36 px Verdana
+
+            vscreen.blit(Images[card.image_name],(start_x + i * (card_width + spacing), start_y))  # Draw card image at calculated position
+
+            move_name_surface = my_font.render(card.name, True, (255, 255, 255))  # White text
+            vscreen.blit(move_name_surface, (4 + start_x + i * (card_width + spacing), start_y - 41))  # Draw move name below the card
+
+
+            my_font = pygame.font.SysFont("Verdana", 38)  # setting it slightly bigger for the outline, only works on single characters because math or something, idk I guess you could do it if you individually rendered each character, but it's not like It's all that important for anything aside from the stuff drawn on the moves themselves
+            #Actually, I think it's still offset because pygame renders stuff from the top left corner and not the center, but it still gives it a "shade" if the "outline" isn't too much bigger
+
+            move_cost_surface_outline = my_font.render(f"{card.cost}", True, (0, 0, 0))  # black outline
+            vscreen.blit(move_cost_surface_outline, (206 + start_x + i * (card_width + spacing), start_y - 8))  
+
+            my_font = pygame.font.SysFont("Verdana", 36)  # setting back to normal
+
+            move_cost_surface = my_font.render(f"{card.cost}", True, (245, 215, 125))  # tan-yellow text
+            vscreen.blit(move_cost_surface, (206 + start_x + i * (card_width + spacing), start_y - 8))  # Draw move cost below the move name
+
+
+
+
+
+            
+
+
+    def draw_fight(self): 
+        # This is where I will actually draw the fight with images and stuff
+        my_font = pygame.font.SysFont("Verdana", 30)
+
+        vscreen.blit(Images["Battle_Background.png"], (0, 0))  # Draw fight background
+
+        vscreen.blit(Images[Player.image_name], (200, 400))  # Draw player image
+
+        vscreen.blit(Images[Enemy.image_name], (2000, 400))  # Draw enemy image
+
+
+        my_font = pygame.font.SysFont("Verdana", 25)
+        Enemy_status_surface = my_font.render(f"{Enemy.name}) HP:{Enemy.HP}/{Enemy.maxHP} STR:{Enemy.STR} DEF:{Enemy.DEF} Block:{Enemy.block}", True, (255, 255, 255))  # White text
+        my_font = pygame.font.SysFont("Verdana", 23)
+        Enemy_status_effects_surface = my_font.render(f"Effects: {Enemy.status_effects}", True, (0, 0, 0))  # Black text
+
+        Enemy_center_x = (Images[Enemy.image_name].get_width() / 2)
+        Enemy_status_center_x = Enemy_status_surface.get_width() / 2
+
+        Status_backround = pygame.Rect(2000 + Enemy_center_x - Enemy_status_center_x, 320, Enemy_status_surface.get_width(), 70)  # x, y, width, height
+        pygame.draw.rect(vscreen, (128, 128, 128), Status_backround) #blue backround for enemy status
+
+        vscreen.blit(Enemy_status_surface, (2000 + Enemy_center_x - Enemy_status_center_x, 320))  # Draw enemy status  -  I genuenly stared at the wall for like 3 minutes trying to figure out how to make it so both of their centers are on the same x coordinate
+        vscreen.blit(Enemy_status_effects_surface, (2000 + Enemy_center_x - Enemy_status_center_x, 355))  # Draw enemy status effects  -  Status effects are not actually centered, but they begin at the same x as status so I think it's okay
+
+        
+
+
+
+        my_font = pygame.font.SysFont("Verdana", 33)
+        Enemy_move_surface = my_font.render(f"Enemy Move: {Enemy.enemy_move.name}, {Enemy.enemy_move.type}-{Enemy.enemy_move.power}", True, (255, 255, 255))  # White text
+        my_font = pygame.font.SysFont("Verdana", 30)
+        Enemy_move_Effects_surface = my_font.render(f"Effects: {Enemy.enemy_move.tags}", True, (0, 0, 0))  # Black text
+        
+        move_offset = Images[Enemy.image_name].get_height() + 20
+        Enemy_move_center_x = Enemy_move_surface.get_width() / 2
+
+        move_backround = pygame.Rect(2000 + Enemy_center_x - Enemy_move_center_x, 400 + move_offset, Enemy_move_surface.get_width(), 75)  # x, y, width, height
+        pygame.draw.rect(vscreen, (130, 130, 200), move_backround) #blue backround for enemy move
+
+        vscreen.blit(Enemy_move_surface, (2000 + Enemy_center_x - Enemy_move_center_x, 400 + move_offset))  # Draw enemy move
+        vscreen.blit(Enemy_move_Effects_surface, (2000 + Enemy_center_x - Enemy_move_center_x, 435 + move_offset))  # Draw enemy move effects
+
+        Player_status_box = pygame.Rect(1, 1400, 2560, 50)  # x, y, width, height
+        pygame.draw.rect(vscreen, (128, 128, 128), Player_status_box) 
+
+        my_font = pygame.font.SysFont("Verdana", 30)
+        Player_status_surface = my_font.render(f"{Player.name}) HP:{Player.HP}/{Player.maxHP} STR:{Player.STR} DEF:{Player.DEF} Block:{Player.block} Pending Damage:{Player.pending_damage} Energy:{Player.Energy}/{Player.MaxEnergy} Effects:{Player.status_effects}", True, (255, 255, 255))  # White text
+        vscreen.blit(Player_status_surface, (10, 1403))  # Draw player status
+
+        pygame.draw.circle(vscreen, (0, 0, 0), (1280, 1305), 54)
+
+        pygame.draw.circle(vscreen, (130, 130, 200), (1280, 1305), 50)  
+
+        my_font = pygame.font.SysFont("Verdana", 70)
+        energy_count = my_font.render(f"{Player.Energy}", True, (0, 0, 255)) 
+        x=energy_count.get_width()/2    # Hell yeah, baby, now this is what I call programming, even though it's really just centering a surface, but I did it all by myself
+        y=energy_count.get_height()/2   # okay, technically I guess calculating it every frame is a little inefficient but whatever
+
+        my_font = pygame.font.SysFont("Verdana", 72)
+        energy_count_shade = my_font.render(f"{Player.Energy}", True, (0, 0, 5))
+
+        vscreen.blit(energy_count_shade, (1280-x, 1304-y)) # Draws a shade to make it pop a little, plus it looks a little better
+        vscreen.blit(energy_count, (1280-x, 1304-y))  # Draw Player.energy, made it a little higher since it looked a little off even though it isn't centered
+        
+
+
+        game_states.draw_hand(vscreen, hand, 400, 900, 2160, 100)  # Draw player's hand - start x, start y, width, height - vscreen resolustion: (2560x1440)
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def handle_map_logic(self):
         global game_state
         global Enemy
@@ -911,10 +1143,15 @@ class node_generation_or_something_idk:
                             if node.encounter_type == "enemy" or node.encounter_type == "boss": #assigning a boss is handled in assign_new_enemy
                                 game.assign_new_enemy()
                                 Player.make_hand()
-                                game_state = "fight"
+                                
+                                if dev_mode == True:
+                                    game_state = "dev_figth"
+                                else:
+                                    game_state = "fight"
                             
                             elif node.encounter_type == "rest":
                                 game_state = "rest"
+
 
                                 
 
@@ -1091,8 +1328,7 @@ game = gameloop(Player, Enemy)
 
 
 
-Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", {}, 3, 5)
-Player = copy.deepcopy(Kori)
+
 Player.current_node = layers[0][0]
 
 
@@ -1142,14 +1378,14 @@ Eror_screen = pygame.Rect(0, 0, 9999, 9999)
 Player.make_hand()
 
 
-def basic_draw_fight():
+def dev_draw_fight():
     game.draw_button(vscreen, player_square, Player.__repr__())
     game.draw_button(vscreen, enemy_square, Enemy.__repr__())
     game.draw_button(vscreen, player_attack_square, "Player Attack")    
     game.draw_button(vscreen, enemy_attack_square, "Enemy Attack")
     game.draw_button(vscreen, resolve_square, "Resolve Damage")
     game.draw_button(vscreen, end_turn_square, "End Turn")
-    game.draw_hand(vscreen, hand, hand_start_x, hand_start_y, end_x, hand_card_width, hand_card_height)
+    game.dev_draw_hand(vscreen, hand, hand_start_x, hand_start_y, end_x, hand_card_width, hand_card_height)
     game.draw_button(vscreen, enemy_intent, f"Enemy Intent: {Enemy.enemy_move if hasattr(Enemy, 'enemy_move') else 'None'}")
     game.draw_button(vscreen, turn_count_square, f"Turn: {turn_count}")
     game.draw_button(vscreen, choose_new_card_square, "Choose New Card")
@@ -1162,8 +1398,13 @@ def basic_draw_fight():
     game.draw_button(vscreen, gimme_money, "Gimme 10 Money")
     game.draw_button(vscreen, force_shop, "Force Shop")
 
-def draw_error_screen():
+def draw_error_screen(): 
     game.draw_button(vscreen, Eror_screen, "ERROR: Invalid Game State")
+
+def handle_error_screen_logic(): #If you click, it exits the game since there is nothng else to do
+    if event.type == pygame.MOUSEBUTTONDOWN:
+        pygame.quit()
+        sys.exit()
 
 hand_start_x = 200
 hand_start_y = 500
@@ -1171,18 +1412,20 @@ hand_card_width = 100
 hand_card_height = 150 
 end_x= 800
 
-
-
+if dev_mode == True:
+    game_state = "dev_figth"
+else:
+    game_state = "fight"
 
 enemy_move = Enemy.make_enemy_move()
 
-#------------------------------- Main Pygame Loop -------------------------------
+#------------------------------- Main Loop -------------------------------
 
 while True:
     vscreen.fill((0, 0, 0))
 
-    if game_state == "fight":
-        basic_draw_fight()
+    if game_state == "dev_figth":
+        dev_draw_fight()
 
     elif game_state == "choose_new_card":
         game.make_choice_new_card()
@@ -1195,6 +1438,10 @@ while True:
 
     elif game_state == "shop":
         game_states.draw_shop()
+
+    elif game_state == "fight":
+        game_states.draw_fight()
+    
 
     else:
         draw_error_screen()
@@ -1218,8 +1465,8 @@ while True:
 
 
 
-        if game_state == "fight":
-            game.handle_basic_logic()
+        if game_state == "dev_figth":
+            game.dev_handle_basic_logic()
 
         elif game_state == "choose_new_card":
             game.handle_choice_new_card()
@@ -1232,6 +1479,17 @@ while True:
         
         elif game_state == "shop":
             game_states.handle_shop_logic()
+
+        elif game_state == "fight":
+            if event.type == pygame.KEYDOWN:
+                enemy = game.assign_new_enemy()
+                Player.make_hand()
+
+
+
+
+        else:
+            handle_error_screen_logic()
 
 
         
