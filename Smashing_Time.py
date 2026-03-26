@@ -84,7 +84,7 @@ for character in List_of_characters:
 
 for card in List_of_cards:
     if card == "Poison_Strike.jpg" or card == "Enrage.jpg": #these cards have different resolutions for some reason, I don't know why
-        transform_images(card, 0.1925) #compleately eyeballed it, but it looks identical to the other cards. If it's stupid but works, it's not stupid.
+        transform_images(card, 0.1924) #compleately eyeballed it, but it looks identical to the other cards. If it's stupid but works, it's not stupid. Also I checked and they get scalled to the same width so it functionally works
     else:
         transform_images(card, 0.15)
 
@@ -1002,11 +1002,12 @@ class node_generation_or_something_idk:
                 if node is Player.current_node: # if the node and the player's current node are the same
                     pygame.draw.circle(vscreen, (255, 215, 0), (node.node_x, node.node_y), 35, 3)  # highlighted with yellow
 
-    def draw_hand(self,vscreen, hand, start_x, start_y, end_x,  card_width): # reused from dev_draw_hand, that's why there is card_width even though I don't set it. Think of it like a the way to do spacing
+    def draw_hand(self,vscreen, hand, start_x, start_y, end_x): # reused from dev_draw_hand, that's why there is card_width even though I don't set it.
+        card_width = 230 #I checked and that is the width of the images once transformed, and since I don't plan to ever change how big the cards will be it's okay to just set it here instead of passing it as a parameter like dev_draw_hand
 
-        L = end_x - start_x
+        L = end_x - start_x # total length
         
-        spacing = (L - len(hand)*card_width) / (len(hand) + 1)
+        spacing = (L - len(hand)*card_width) / (len(hand) + 1) # adaptive spacing based on number of cards
 
         for i, card in enumerate(hand):
             my_font = pygame.font.SysFont("Verdana", 36)  # 36 px Verdana
@@ -1027,8 +1028,6 @@ class node_generation_or_something_idk:
 
             move_cost_surface = my_font.render(f"{card.cost}", True, (245, 215, 125))  # tan-yellow text
             vscreen.blit(move_cost_surface, (206 + start_x + i * (card_width + spacing), start_y - 8))  # Draw move cost below the move name
-
-
 
 
 
@@ -1102,16 +1101,37 @@ class node_generation_or_something_idk:
         
 
 
-        game_states.draw_hand(vscreen, hand, 400, 900, 2160, 100)  # Draw player's hand - start x, start y, width, height - vscreen resolustion: (2560x1440)
+        game_states.draw_hand(vscreen, hand, 400, 900, 2160)  # Draw player's hand - start x, start y, width, height - vscreen resolustion: (2560x1440)
     
 
 
 
+    def handle_fight_logic(self): # vscreen.blit(Images[card.image_name],(start_x + i * (card_width + spacing), start_y)) 
+                                # game_states.draw_hand(vscreen, hand, 400, 900, 2160, 100)
+                              # draw_hand(self,vscreen, hand, start_x, start_y, end_x,  card_width)
+        start_x = 400
+        end_x = 2160
+        card_width = 230
 
+        L = end_x - start_x # total length
+    
+        spacing = (L - len(hand)*card_width) / (len(hand) + 1) # adaptive spacing based on number of cards
+                            
+        for i, card in enumerate(hand): #Completaly forgot how this worked in dev_fight, so in case I forget again, the card variable coresponds to the move in hand that you are drawing in each instance/go of the loop/whatever since it's going directly from the hand
+            L = end_x - start_x # total length
+        
+            spacing = (L - len(hand)*card_width) / (len(hand) + 1) # adaptive spacing based on number of cards
 
-
-
-
+            clicking_rect = pygame.Rect(400 + i *(230 + spacing), 900, 230, 307)  # x, y, width, height - matches the position and size of the card images drawn in draw_fight
+            
+            
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if clicking_rect.collidepoint(event.pos):
+                    print(f"Clicked on card: {card.name}")
+                    Player.resolve_move(card)
+                    print(f"Played {card}. New hand: {hand}")
+                    print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
+                    break  # Exit loop after playing one card
 
 
 
@@ -1481,9 +1501,7 @@ while True:
             game_states.handle_shop_logic()
 
         elif game_state == "fight":
-            if event.type == pygame.KEYDOWN:
-                enemy = game.assign_new_enemy()
-                Player.make_hand()
+            game_states.handle_fight_logic()
 
 
 
