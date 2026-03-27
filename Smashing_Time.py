@@ -2,11 +2,17 @@ import random
 import time
 from tkinter import font
 import copy
+from turtle import distance
 import pygame
 import sys
 import os
 
+
+
+
+
 pygame.init()
+print("hello world")
 
 
 #     Loading assets here:
@@ -47,6 +53,9 @@ List_of_cards = [       # A list of all cards
     "SMASH!.jpg",
     "Smash.jpg",
     "Smite.jpg",
+    "Power_Up.jpg",
+    "Shrug_off.jpg",
+    
 ]
 
 List_of_backrounds = [
@@ -54,13 +63,21 @@ List_of_backrounds = [
 ]
 
 List_of_characters = [
-    "Joe.png", # This guy is a stock photo that I did NOT pay for and I don't care. Sue me. 
+    "Joe.png", # This guy is a stock photo that I did NOT pay for and I don't care. Sue me. /s
     "Kori.png",
     "Repair_Man.png",
     "Extremely_Sucpicious_Barell.png",
     "Thug.png",
     "Construct.png",
 ]
+
+the_weird_ones = [ #these cards have different resolutions for some reason, I don't know why
+    "Poison_Strike.jpg",
+    "Enrage.jpg",
+    "Poison_Bomb.jpg",
+    "Glare.jpeg",
+]
+
 
 #loading all images:
 
@@ -83,7 +100,7 @@ for character in List_of_characters:
     transform_images(character, 0.70)
 
 for card in List_of_cards:
-    if card == "Poison_Strike.jpg" or card == "Enrage.jpg": #these cards have different resolutions for some reason, I don't know why
+    if card in the_weird_ones: #some of the cards have different resolutions for some reason, so I had to scale them differently, I don't know why this happened since they should all be the same, but I am not getting paid enough to care
         transform_images(card, 0.1924) #compleately eyeballed it, but it looks identical to the other cards. If it's stupid but works, it's not stupid. Also I checked and they get scalled to the same width so it functionally works
     else:
         transform_images(card, 0.15)
@@ -100,6 +117,25 @@ VIRTUAL_SIZE = (2560, 1440)
 rscreen = pygame.display.set_mode((0, 0), pygame.RESIZABLE)  #this is the real screen that gets resized and actually shown (x,y) means starting dimiensions, 0,0 means full screen
 vscreen = pygame.Surface(VIRTUAL_SIZE)  # virtual screen that we draw everything to, then scale to rscreen size
 
+def transform_screen(): #scaling screen sizes so they work on any resolution no matter the device
+    scaled = pygame.transform.scale(vscreen, rscreen.get_size())
+    rscreen.blit(scaled, (0, 0))
+
+
+vscreen_x, vscreen_y = VIRTUAL_SIZE
+rscreen_x, rscreen_y = rscreen.get_size()
+
+scale_x = vscreen_x / rscreen_x #calculated outside the function since I don't need it every frame
+scale_y = vscreen_y / rscreen_y
+
+def transform_mouse_pos(): # since I am drawing things on a virtual screen, the position of where objects are drawn and displayed aren't consistent (unless you have 2560px resolution), so I scaled the mouse position to match the virtual screen. Thank Jod you can override event.pos
+    if event.type == pygame.MOUSEMOTION or event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.MOUSEBUTTONUP:
+        mouse_x, mouse_y = event.pos
+        transformed_x = int(mouse_x * scale_x)
+        transformed_y = int(mouse_y * scale_y)
+        event.pos = (transformed_x, transformed_y)
+
+
 pygame.display.set_caption("Smashing Time")
 
 clock = pygame.time.Clock()
@@ -109,24 +145,26 @@ chance_of_branching = 0.5  # 50% chance to branch sideways in encounter map gene
 encounter_types = ["enemy", "shop", "rest",]
 weights =          [   90,      5,      5, ]  # might scrap events - Actually I did scrap them them, now is later
 
-dramatic_pause = False #flag for dramatic pause before you get forwarded to an enemy encounter from the map, kinda silly but whatever
-dramatic_pause_timer = 1.5  # seconds
 
 
 dev_mode = False # turns on shitty looking mode
-hand = []
+hand = []    # list of all cards/moves/whatever that the player can play
 turn_count =  1
-game_state = "dev_figth"
+
+if dev_mode == True:  #making sure game_state is consistent with dev_mode
+    game_state = "dev_figth"
+else:
+    game_state = "fight" 
+#game_states is the most important variable in the game, it controls what state the game is in everything in the main loop is governed by it
 settings =  False
 rest_done = False
 is_boss_fight = False #flag for if current fight is a boss fight, mostly used so you get a new map after beating a boss
 
-print("hello world")
 
 attack="ATK"  #toying with the idea of defining move types as variables instead of strings
 defend="DEF"  #"Feeling like programing well, might delete later"
 STR_up="STRup"  
-DEF_up="DEFup" 
+DEF_up="DEFup" #I am a dysgrace to programing, that's who I am. Spaghetti code harder than thought possible. This isn't even the most usless part of the code. Be glad I actually removed the two "dramatic_timer" variables that didn't do anything but were called 4 times
 
 
 
@@ -159,14 +197,15 @@ Kori_pool = [
     move("Smash", "Smash.jpg", 10, "ATK", 1, tags={}),
     move("Smash", "Smash.jpg", 10, "ATK", 1, tags={}),
     move("Smash", "Smash.jpg", 10, "ATK", 1, tags={}),
-    move("DEF", "Defend.jpg", 10, "DEF", 1, tags={}),
-    move("DEF", "Defend.jpg", 10, "DEF", 1, tags={}),
-    move("DEF", "Defend.jpg", 10, "DEF", 1, tags={}),
+    move("Defend", "Defend.jpg", 10, "DEF", 1, tags={}),
+    move("Defend", "Defend.jpg", 10, "DEF", 1, tags={}),
+    move("Defend", "Defend.jpg", 10, "DEF", 1, tags={}),
     move("SMASH!", "SMASH!.jpg", 25, "ATK", 2, tags={}),
     move("Enrage", "Enrage.jpg", 5, "STRup", 1, tags={"enrage": None}),
     move("Gamble", "Gamble.jpg", 0, "spell", 1, tags={"redraw": True}),
     move("Deck Out", "Deck_Out.jpg", 7, "DEF", 1, tags={"draw": 2}),
     move("Poison Strike", "Poison_Strike.jpg", 7, "ATK", 1, tags={"poison": 3}),
+    move("Fury" , "Fury.jpg", 6 , "ATK", 1, tags={"multihit": 2}),
 ]
 
 
@@ -212,13 +251,13 @@ floor1_loot = [
     move("Power Up", "Power_Up.jpg", 5, "STRup", 1, tags={}), #
     move("Poison Strike", "Poison_Strike.jpg", 7, "ATK", 1, tags={"poison": 3}), ##damages enemy at the end of turn, then loses 1 poison
     move("Poison Bomb", "Poison_Bomb.jpg", 2, "ATK", 2, tags={"poison": 5}), #
-    move("Concentrate", "Concentrate.jpg", 5, "DEFup", 1, tags={}), #
+    move("Concentrate", "Concentrate.jpeg", 5, "DEFup", 1, tags={}), #
     move("Shrug off", "Shrug_off.jpg", 20, "DEF", 1, tags={}),
     move("Deck Out", "Deck_Out.jpg", 7, "DEF", 0, tags={"draw": 2}), ##draw 2 cards 
     move("Gamble", "Gamble.jpg", 0, "spell", 0, tags={"redraw": True}), ##you draw a new hand, can only be used once per turn so you can't spam zero cost moves
     move("Smite" , "Smite.jpg", 10, "ATK", 1, tags={"blind": 2}), ##makes enemy attacks do 75% damage
     move("Fury" , "Fury.jpg", 6 , "ATK", 1, tags={"multihit": 2}), ##attack twice
-    move("Glare", "Glare.jpg", 5, "ATK", 0, tags={"blind": 1}), #enemy attacks do 75% damage for x turns
+    move("Glare", "Glare.jpeg", 5, "ATK", 0, tags={"blind": 1}), #enemy attacks do 75% damage for x turns
     move("Pray", "Pray.jpg", 5, "DEF", 1, tags={"energised":1, }), #I thought about making it heal but that would promote delaying kills, which is not fun, now it gives you +1 energy next turn
 ]
 
@@ -684,6 +723,11 @@ class gameloop:
                 print()
                 print("Force Shop button clicked!")
                 game_states.prepare_shop()
+
+            elif force_new_card.collidepoint(event.pos):
+                print()
+                print("Force New Card button clicked!")
+                game.start_new_card_selection()
                 
             
             for i, card in enumerate(hand):
@@ -747,15 +791,10 @@ class gameloop:
         for i, card in enumerate(current_choices):
             print(f"{i + 1}: {card.name}")
 
-    def make_choice_new_card(self):
-        global current_choices
 
-        for i, card in enumerate(current_choices):
-            pygame.draw.rect(vscreen, (255, 255, 255), (200 + i * 200, 300, 150, 50))
-            font = pygame.font.SysFont(None, 24)
-            text_surface = font.render(card.name, True, (0, 0, 0))
-            text_rect = text_surface.get_rect(center=(200 + i * 200 + 75, 300 + 25))
-            vscreen.blit(text_surface, text_rect)
+
+        
+        
 
 
     def handle_choice_new_card(self):
@@ -1029,8 +1068,35 @@ class node_generation_or_something_idk:
             move_cost_surface = my_font.render(f"{card.cost}", True, (245, 215, 125))  # tan-yellow text
             vscreen.blit(move_cost_surface, (206 + start_x + i * (card_width + spacing), start_y - 8))  # Draw move cost below the move name
 
+            move_stats_surface = my_font.render(f"{card.type}-{card.power}", True, (255, 255, 255))  # White text
+            vscreen.blit(move_stats_surface, (4 + start_x + i * (card_width + spacing), start_y + 303))  # Draw move type and power bellow cards
+            
+            if card.tags:
+                if "multihit" in card.tags:
+                    move_tags_surface = my_font.render(f"Multihit: {card.tags['multihit']}", True, (255, 255, 255))  # White text
+                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+                
+                elif "poison" in card.tags:
+                    move_tags_surface = my_font.render(f"Poison: {card.tags['poison']}", True, (255, 255, 255))  # White text
+                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
 
+                elif "draw" in card.tags:
+                    move_tags_surface = my_font.render(f"Draw: {card.tags['draw']}", True, (255, 255, 255))  # White text
+                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+                
+                elif "redraw" in card.tags:
+                    move_tags_surface = my_font.render(f"Redraw", True, (255, 255, 255))  # White text
+                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+               
+                elif "energise" in card.tags:
+                    move_tags_surface = my_font.render(f"Energise: {card.tags['energise']}", True, (255, 255, 255))  # White text
+                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
 
+                elif "enrage" in card.tags:
+                    move_tags_surface = my_font.render(f"Enrage", True, (255, 255, 255))  # White text
+                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+                
+                
             
 
 
@@ -1084,25 +1150,30 @@ class node_generation_or_something_idk:
         Player_status_surface = my_font.render(f"{Player.name}) HP:{Player.HP}/{Player.maxHP} STR:{Player.STR} DEF:{Player.DEF} Block:{Player.block} Pending Damage:{Player.pending_damage} Energy:{Player.Energy}/{Player.MaxEnergy} Effects:{Player.status_effects}", True, (255, 255, 255))  # White text
         vscreen.blit(Player_status_surface, (10, 1403))  # Draw player status
 
-        pygame.draw.circle(vscreen, (0, 0, 0), (1280, 1305), 54)
+        pygame.draw.circle(vscreen, (0, 0, 0), (1280, 1311), 54) # border for energy count circle
 
-        pygame.draw.circle(vscreen, (130, 130, 200), (1280, 1305), 50)  
+        pygame.draw.circle(vscreen, (130, 130, 200), (1280, 1311), 50)  # energy count circle
 
-        my_font = pygame.font.SysFont("Verdana", 70)
+        my_font = pygame.font.SysFont("Verdana", 70) #  draw a count of you energy
         energy_count = my_font.render(f"{Player.Energy}", True, (0, 0, 255)) 
         x=energy_count.get_width()/2    # Hell yeah, baby, now this is what I call programming, even though it's really just centering a surface, but I did it all by myself
         y=energy_count.get_height()/2   # okay, technically I guess calculating it every frame is a little inefficient but whatever
 
-        my_font = pygame.font.SysFont("Verdana", 72)
+        my_font = pygame.font.SysFont("Verdana", 72) # shading for energy count
         energy_count_shade = my_font.render(f"{Player.Energy}", True, (0, 0, 5))
 
-        vscreen.blit(energy_count_shade, (1280-x, 1304-y)) # Draws a shade to make it pop a little, plus it looks a little better
-        vscreen.blit(energy_count, (1280-x, 1304-y))  # Draw Player.energy, made it a little higher since it looked a little off even though it isn't centered
+        vscreen.blit(energy_count_shade, (1280-x, 1309-y)) # Draws a shade to make it pop a little, plus it looks a little better
+        vscreen.blit(energy_count, (1280-x, 1309-y))  # Draw Player.energy, made it a little higher since it looked a little off even though it isn't centered
         
+        pygame.draw.circle(vscreen, (0, 0, 0), (2250, 1230), 104) # ouline for end turn button
+        pygame.draw.circle(vscreen, (200, 210, 0), (2250, 1230), 100) # end turn button
 
+        my_font = pygame.font.SysFont("Verdana", 35)
+        end_turn_label = my_font.render("END TURN", True, (0, 0, 0))
+        vscreen.blit(end_turn_label, (2250 - end_turn_label.get_width() / 2, 1230 - end_turn_label.get_height() / 2)) # Draw end turn button, centered on the circle
 
         game_states.draw_hand(vscreen, hand, 400, 900, 2160)  # Draw player's hand - start x, start y, width, height - vscreen resolustion: (2560x1440)
-    
+
 
 
 
@@ -1132,8 +1203,46 @@ class node_generation_or_something_idk:
                     print(f"Played {card}. New hand: {hand}")
                     print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
                     break  # Exit loop after playing one card
+        
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            distance = ((event.pos[0] - 2250) ** 2 + (event.pos[1] - 1230) ** 2) ** 0.5 # distance from coordinates 2250, 1230 (center of the end_turn_circle) **05 = ²√
+            if distance <= 100:  # Radius of the circle
+                print("End Turn button clicked!")
+                game.end_turn()
 
 
+    def draw_card_choice(self):
+        pygame.draw.rect(vscreen, (20, 20, 20), (0, 0, 2560, 1440))  # blue background for card choice
+
+        my_font = pygame.font.SysFont("Verdana", 50)
+        label_surface = my_font.render("Choose a new card to add to your pool", True, (255, 255, 255))  # White text
+
+        vscreen.blit(label_surface, (1280 - label_surface.get_width() / 2, 500))  # Centered at the top of the screen
+
+        game_states.draw_hand(vscreen, current_choices, 500, 720, 2700) # start x, start y, end x - vscreen resolustion: (2560x1440)
+
+    
+    def handle_card_choice_logic(self):
+        start_x = 500
+        end_x = 2700
+        card_width = 230
+
+        for i, card in enumerate(current_choices): 
+            L = end_x - start_x # total length
+        
+            spacing = (L - len(current_choices)*card_width) / (len(current_choices) + 1) # adaptive spacing based on number of cards
+
+            clicking_rect = pygame.Rect(start_x + i *(230 + spacing), 720, 230, 307)  # x, y, width, height - matches the position and size of the card images drawn in draw_fight
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if clicking_rect.collidepoint(event.pos):
+                    print(f"Clicked on card: {card.name}")
+                    Player.pool.append(card)
+                    print(f"You chose {card.name} to add to your pool!")
+                    game_states.prepare_map()
+                    break  # Exit loop after choosing one card
+        
+
+    
 
 
 
@@ -1144,8 +1253,7 @@ class node_generation_or_something_idk:
         global game_state
         global Enemy
         global Player
-        global dramatic_pause
-        global dramatic_pause_timer
+
 
         
 
@@ -1384,8 +1492,10 @@ choose_new_card_square = pygame.Rect(600, 980, 200, 80)
 force_map = pygame.Rect(1250, 959, 150, 80)
 force_rest = pygame.Rect(1250, 1040, 150, 80)
 force_shop = pygame.Rect(1250, 1121, 150, 80)
+force_new_card = pygame.Rect(1250, 1202, 150, 80)
 
-gimme_money = pygame.Rect(1250, 1121 + 81, 150, 80)
+    
+gimme_money = pygame.Rect(1250, 1283, 150, 80)
 
 
 exit_button = pygame.Rect(1300, 20, 80, 40)
@@ -1417,6 +1527,7 @@ def dev_draw_fight():
     game.draw_button(vscreen, money_square, f"Money: {Player.money}")
     game.draw_button(vscreen, gimme_money, "Gimme 10 Money")
     game.draw_button(vscreen, force_shop, "Force Shop")
+    game.draw_button(vscreen, force_new_card, "Force New Card")
 
 def draw_error_screen(): 
     game.draw_button(vscreen, Eror_screen, "ERROR: Invalid Game State")
@@ -1432,10 +1543,6 @@ hand_card_width = 100
 hand_card_height = 150 
 end_x= 800
 
-if dev_mode == True:
-    game_state = "dev_figth"
-else:
-    game_state = "fight"
 
 enemy_move = Enemy.make_enemy_move()
 
@@ -1448,7 +1555,7 @@ while True:
         dev_draw_fight()
 
     elif game_state == "choose_new_card":
-        game.make_choice_new_card()
+        game_states.draw_card_choice()
 
     elif game_state == "map":
         game_states.draw_map()
@@ -1477,6 +1584,7 @@ while True:
 
 
     for event in pygame.event.get():
+        transform_mouse_pos()
         if event.type == pygame.QUIT:  
             pygame.quit()
             sys.exit()
@@ -1489,7 +1597,7 @@ while True:
             game.dev_handle_basic_logic()
 
         elif game_state == "choose_new_card":
-            game.handle_choice_new_card()
+            game_states.handle_card_choice_logic()
         
         elif game_state == "map":
             game_states.handle_map_logic()
@@ -1504,20 +1612,17 @@ while True:
             game_states.handle_fight_logic()
 
 
-
-
-        else:
+        else: 
             handle_error_screen_logic()
 
 
         
-        if settings == True:
+        if settings == True: #overlays on top of everything else
             game.handle_settings()
 
 
 
 
-    scaled = pygame.transform.scale(vscreen, rscreen.get_size())
-    rscreen.blit(scaled, (0, 0))
+    transform_screen()
     pygame.display.flip()
     clock.tick(60)
