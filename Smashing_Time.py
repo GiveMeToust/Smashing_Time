@@ -1,10 +1,6 @@
-import random
-import time
-from tkinter import font
-import copy
-from turtle import distance
 import pygame
-import sys
+import random
+import copy
 import os
 
 
@@ -58,17 +54,38 @@ List_of_cards = [       # A list of all cards
     
 ]
 
+list_of_map_icons = [
+    "Enemy_Icon.png",
+    "Enhanced_Enemy_Icon.png",
+    "Start_Icon.png",
+    "Boss_Icon.png",
+    "Shop_Icon.png",
+    "Rest_Icon.png",
+]
+
+list_of_ATK_and_DEF_icons = [
+    "ATK_Icon.png",
+    "DEF_Icon.png",
+    "STRup_Icon.png",
+    "DEFup_Icon.png",
+]
+
 List_of_backrounds = [
     "Battle_Background.png",
+    "Place_Holder_Rest_Background.jpg",
 ]
 
 List_of_characters = [
-    "Joe.png", # This guy is a stock photo that I did NOT pay for and I don't care. Sue me. /s
+    "Joe.png", # This guy is a stock photo that I did NOT pay for and I don't care. Sue me. /s Anyway it's probably from the stock photo company Alamy but it's hard to say for sure because this guy is a bit of a meme and circulating around the internet for at least a decade
     "Kori.png",
     "Repair_Man.png",
     "Extremely_Sucpicious_Barell.png",
     "Thug.png",
     "Construct.png",
+]
+
+list_of_paricles = [
+    "Heal_Particle.png",
 ]
 
 the_weird_ones = [ #these cards have different resolutions for some reason, I don't know why
@@ -90,14 +107,25 @@ for image_name in List_of_characters:
 for image_name in List_of_backrounds:
     Load_Image(image_name)
 
+for image_name in list_of_map_icons:
+    Load_Image(image_name)
+
+for image_name in list_of_ATK_and_DEF_icons:
+    Load_Image(image_name)
+
+for image_name in list_of_paricles:
+    Load_Image(image_name)
 #transforming images sizes:
 
 def transform_images(image_name, scale_factor):
     x , y = Images[image_name].get_size()
     Images[image_name] = pygame.transform.scale(Images[image_name], (x * scale_factor, y * scale_factor))
 
-for character in List_of_characters:
-    transform_images(character, 0.70)
+for character in List_of_characters: # the construct is a little taller than intended and then it overlaps with the hand and stuff
+    if character == "Construct.png": 
+        transform_images(character, 0.65)
+    else:
+        transform_images(character, 0.70)
 
 for card in List_of_cards:
     if card in the_weird_ones: #some of the cards have different resolutions for some reason, so I had to scale them differently, I don't know why this happened since they should all be the same, but I am not getting paid enough to care
@@ -105,10 +133,30 @@ for card in List_of_cards:
     else:
         transform_images(card, 0.15)
 
-for background in List_of_backrounds:
-    transform_images(background, 1)
+scale_for_place_holder = 2560/Images["Place_Holder_Rest_Background.jpg"].get_width() # the place holder background has a different resolution than the battle background, so I had to scale it differently to make it fit the screen, I don't know why this happened since they should all be the same, but I am not getting paid enough to care
 
-#
+for background in List_of_backrounds:
+    if background == "Place_Holder_Rest_Background.jpg": # The place holder has worse resolution (not the same as vscreen) so it will scale badly as the pixels are partially stretched, but since it's a placeholder it's whatever
+        transform_images(background, scale_for_place_holder)
+    else:
+        transform_images(background, 1)
+
+for icon in list_of_map_icons:
+    if icon == "Start_Icon.png":
+        transform_images(icon, 0.045)
+    elif icon == "Boss_Icon.png":
+        transform_images(icon, 0.10)
+    else:
+        transform_images(icon, 0.15)
+
+for icon in list_of_ATK_and_DEF_icons:
+    if icon == "DEFup_Icon.png" or icon == "DEF_Icon.png":  #The shields are a little bigger 
+        transform_images(icon, 0.40)
+    else:
+        transform_images(icon, 0.48)
+
+for particle in list_of_paricles:
+    transform_images(particle, 0.5)
 
 
 my_font = pygame.font.SysFont("Verdana", 36)  # 36 px Verdana
@@ -151,15 +199,21 @@ dev_mode = False # turns on shitty looking mode
 hand = []    # list of all cards/moves/whatever that the player can play
 turn_count =  1
 
-if dev_mode == True:  #making sure game_state is consistent with dev_mode
-    game_state = "dev_figth"
-else:
-    game_state = "fight" 
+game_state = "fight" # can be "fight", "choose_new_card", "shop", "rest", 
 #game_states is the most important variable in the game, it controls what state the game is in everything in the main loop is governed by it
-settings =  False
-rest_done = False
-is_boss_fight = False #flag for if current fight is a boss fight, mostly used so you get a new map after beating a boss
 
+# Setting up some variables because python is stupid and not ran by genetically modified hamsters
+settings =  False
+spent_rest = False #flag for if you have spent time resting
+particle_alpha = 255 #used for the heal animation, it controls the transparency of the heal particle, 
+particle_y = 0 #used for the heal animation
+particle_x = 0 #used for the heal animation
+set_up_heal_animation = True #used for the heal animation
+heal_animation_playing = False #flag to turn on/off the heal animation because I tried to set up something inteligent but failed
+
+draw_upgrade_potential = False # flag whether you will draw how much a card could be upgraded on the position of the mouse
+upgrade_potential = 0 # the value that says how much it could be upgraded
+pre_upgrade_potential = 0 # I fricking hate python and that this is the best I could manage to actually do the thing I wanna do
 
 attack="ATK"  #toying with the idea of defining move types as variables instead of strings
 defend="DEF"  #"Feeling like programing well, might delete later"
@@ -171,13 +225,21 @@ DEF_up="DEFup" #I am a dysgrace to programing, that's who I am. Spaghetti code h
 
 settings_grey_out = pygame.Surface((2560, 1440)) # over the whole screen
 settings_grey_out.fill((0, 0, 0))  # Black color
-settings_grey_out.set_alpha(128)  # Set transparency level (0-255)
+settings_grey_out.set_alpha(128)  # Set transparency level (0-255) 0=transparent, 255=opaque
+
+death_red_out = pygame.Surface((2560, 1440)) # over the whole screen
+death_red_out.fill((255, 0, 0))  # Red color
+death_red_out.set_alpha(20)  # Set transparency level (0-255) 0=transparent, 255=opaque
+
 
 quit_from_settings = pygame.Rect(1180, 700, 200, 100)  # x, y, width, height
 settings_dev_mode_toggle = pygame.Rect(1180, 850, 200, 100)  # x, y, width, height
 
 cost_of_cards = 30 
 cost_of_supplies = 20
+
+frame_delay = False # used to prevent you from immidietly closing the defeat screen
+
 
 class move:
     def __init__(self, name, image_name, power, type, cost, tags):
@@ -187,7 +249,19 @@ class move:
         self.type = type
         self.cost = cost
         self.tags = tags
-        
+    
+    def upgrade(self):
+        if self.type == "ATK" or self.type == "DEF":
+            upgrade_amount = 4 + self.power*0.2
+            upgrade_amount = round(upgrade_amount)
+        elif self.type == "STRup" or self.type == "DEFup":
+            upgrade_amount = 1 + self.power*0.2
+            upgrade_amount = round(upgrade_amount)
+        elif self.type == "spell":
+            upgrade_amount = 0 #spells only cary tags and don't do anything, so upgrading their power is pointless
+    
+        print(f"Upgrading {self.name} from {self.power} to {self.power + upgrade_amount} power!")
+        self.power += upgrade_amount
 
 
     def __repr__(self):
@@ -277,7 +351,7 @@ class champion:
         self.block = 0
         self.pool = pool
         self.poolname = poolname
-        self.status_effects = status_effects # usually empty when created, a dictionary of status effects and their values or lack of therefore
+        self.status_effects = status_effects 
         self.image_name = image_name
 
     def __repr__(self):
@@ -419,14 +493,14 @@ class player(champion):
             print(f"{self.name} is fucking dead and cannot take more damage!")
             return
 
-        damage_resolved = (self.pending_damage + Enemy.STR) - (self.block + self.DEF)
+        damage_resolved = (self.pending_damage) - (self.block + self.DEF)
         if damage_resolved < 0:
             damage_resolved = 0
 
         self.HP = self.HP - damage_resolved
 
         x = (f"{self.name} took {damage_resolved} damage ({self.block} block")
-        self.block = self.block - (self.pending_damage + Enemy.STR)
+        self.block = self.block - (self.pending_damage)
         if self.block > 0:
             x += f" {self.block} block remaining!)"
         else:
@@ -438,14 +512,35 @@ class player(champion):
         damage_resolved = 0
         x = ""
 
-
-
-
         if self.HP <= 0:
             self.alive = False  
             print(f"{self.name} has been defeated!") 
-
             
+
+    def draw_defeat_screen(self): # tints the screen red and displays "GAME OVER"
+        vscreen.blit(death_red_out, (0, 0))  # Reded out background
+        vscreen.blit(settings_grey_out, (0, 0)) # further darkened background, reused from settings because I am a lazy bastard
+        pygame.draw.rect(vscreen, (200, 0, 0), quit_from_settings)  # Red quit button
+
+        my_fontfont = pygame.font.SysFont(None, 46) # system font cause I think that's neat for the death screen
+        text_surface = my_fontfont.render("GAME OVER", True, (255, 255, 255))  # White text
+        text_rect = text_surface.get_rect(center=(vscreen.get_width() // 2, vscreen.get_height() // 2 - 100))
+
+        my_font = pygame.font.SysFont("Verdana", 36)  # 36 px Verdana
+        text_rect = text_surface.get_rect(center=quit_from_settings.center)
+
+        vscreen.blit(text_surface, text_rect)
+        
+
+    def handle_defeat_screen_click(self):
+        global frame_delay
+
+        if frame_delay == True: # this happens on the same frame as you hit the end turn button, so you would immidietly also quit from the game. I added this one frame delaay to prevent this
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                print("Quitting game from defeat screen...")
+                pygame.quit()
+                
+        frame_delay = True    
 
 Kori = player("Kori", 100, 0, 0, Kori_pool, "Kori pool", {}, "Kori.png", 3, 5)
 Player = copy.deepcopy(Kori)
@@ -582,17 +677,25 @@ class gameloop:
         if Player.current_node.encounter_type == "boss":
             is_boss_fight = True
             Enemy = copy.deepcopy(random.choice(boss_enemies))
-            Enemy.maxHP = round(Enemy.maxHP*(1 + (Player.current_node.danger_level * 0.5)))
-            Enemy.HP = Enemy.maxHP
             print(f"The boss {Enemy.name} appears!")
             Enemy.make_enemy_move()  
         else:
             Enemy = copy.deepcopy(random.choice(floor1_enemies))
-            Enemy.maxHP = round(Enemy.maxHP*(1 + (Player.current_node.danger_level * 0.05)))
-            Enemy.HP = Enemy.maxHP
+            self.adjust_enemy_difficulty()
             print(f"A wild {Enemy.name} appears!")
             Enemy.make_enemy_move()
+    
+    def adjust_enemy_difficulty(self): #makes the enemy stronger the further you go down
+        global Enemy
 
+        Enemy.maxHP = round(Enemy.maxHP*(1 + (Player.current_node.danger_level * 0.05)))
+        Enemy.HP = Enemy.maxHP
+        for move in Enemy.pool:
+            move.power = round(move.power*(1 + (Player.current_node.danger_level * 0.06))) # Honnestly, I am really not sure about the balance of this 
+
+
+
+        print(f"Adjusted {Enemy.name}'s stats for danger level {Player.current_node.danger_level}!")
         
 
     def kill_enemy(self):
@@ -711,7 +814,7 @@ class gameloop:
                 print()
                 print("Exit button clicked!")
                 pygame.quit()
-                sys.exit()
+                
             
             elif gimme_money.collidepoint(event.pos):
                 print()
@@ -829,18 +932,13 @@ class gameloop:
             if quit_from_settings.collidepoint(event.pos):
                 print("Quitting game from settings...")
                 pygame.quit()
-                sys.exit()
+                
                 
             elif settings_dev_mode_toggle.collidepoint(event.pos):
                 dev_mode = not dev_mode
 
-                if game_state == "dev_figth": #flips fight and dev_fight
-                    game_state = "fight"
-                elif game_state == "fight":
-                    game_state = "dev_figth"   
-
                 print(f"Dev Mode toggled to {dev_mode}!")
-                print(f"Game state is now: {game_state}")
+                
 
 
     
@@ -987,59 +1085,75 @@ class node_generation_or_something_idk:
 
     
     def draw_map(self):
+        # Compute centered layout and larger node sizes
+
+        num_layers = len(layers)
+        center_x = vscreen.get_width() // 2
+        center_y = vscreen.get_height() // 2
+
+        # Map area: use 75% of width to give margins
+        map_width = int(vscreen.get_width() * 0.75)
+        layer_spacing_y = 160
+        map_height = (num_layers - 1) * layer_spacing_y if num_layers > 1 else 0
+
+        start_x = center_x - map_width // 2
+        start_y = center_y - map_height // 2 - 40
+
+        # Assign positions for each node in a layer (evenly spaced horizontally)
+        for layer_idx, layer in enumerate(layers):
+            n = len(layer)
+            if n == 0:
+                continue
+            spacing_x = map_width / (n + 1)
+            for i, node in enumerate(layer):
+                node.node_x = int(start_x + (i + 1) * spacing_x)
+                node.node_y = int(start_y + layer_idx * layer_spacing_y)
+
+        # Draw connections (behind nodes)
         for layer in layers:
             for node in layer:
-                
-                # Draw connections
                 for target in node.connections:
-                    pygame.draw.line(vscreen, (255, 255, 255), (node.node_x, node.node_y), (target.node_x, target.node_y), 2) # white , width 2
-                    #I have literally no idea why this works. And I mean LITERALLY no idea. But it does. Like, what the hell is even "target"???
-                    # Nevermind, I am just sleep deprived. It's extremely obvious what target is. I am an idiot.
+                    pygame.draw.line(vscreen, (255, 255, 255), (node.node_x, node.node_y), (target.node_x, target.node_y), 4)
 
-
+        # Draw nodes 
+        node_radius = 40
+        for layer in layers:
+            for node in layer:
+                x, y = node.node_x, node.node_y
                 if node.encounter_type == "start":
-                    pygame.draw.circle(vscreen, (0, 255, 0), (node.node_x, node.node_y), 30)  # Green for start
-                    font = pygame.font.SysFont(None, 24)
-                    text_surface = font.render(node.encounter_type, True, (0, 0, 0))
-                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    vscreen.blit(text_surface, text_rect)
-
+                    icon = Images["Start_Icon.png"]
 
                 elif node.encounter_type == "boss":
-                    pygame.draw.circle(vscreen, (255, 0, 0), (node.node_x, node.node_y), 30)  # Red for boss
-                    font = pygame.font.SysFont(None, 24)
-                    text_surface = font.render(node.encounter_type, True, (0, 0, 0))
-                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    vscreen.blit(text_surface, text_rect)
+                    icon = Images["Boss_Icon.png"]
 
                 elif node.encounter_type == "enemy":
-                    if node.escpecially_dangerous == False:
-                        pygame.draw.circle(vscreen, (255, 255, 255), (node.node_x, node.node_y), 30) # red, green, blue - x, y - radius
+                    if node.escpecially_dangerous:
+                        icon = Images["Enhanced_Enemy_Icon.png"]
                     else:
-                        pygame.draw.circle(vscreen, (255, 0, 255), (node.node_x, node.node_y), 30) # magenta for especially dangerous enemies
-                    font = pygame.font.SysFont(None, 15) # default font, size 15
-                    text_surface = font.render(f"{node.encounter_type} {node.layer}, {node.layer_index}", True, (0, 0, 0))
-                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    vscreen.blit(text_surface, text_rect)
+                        icon = Images["Enemy_Icon.png"]
 
                 elif node.encounter_type == "rest":
-                    pygame.draw.circle(vscreen, (210, 180, 140), (node.node_x, node.node_y), 30)  # Brown for rest
-                    font = pygame.font.SysFont(None, 15) # default font, size 15
-                    text_surface = font.render(f"{node.encounter_type} {node.layer}, {node.layer_index}", True, (255, 255, 255))
-                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    vscreen.blit(text_surface, text_rect)    
+                    icon = Images["Rest_Icon.png"]
 
-               
+                elif node.encounter_type == "shop":
+                    icon = Images["Shop_Icon.png"]
 
-                else:
-                    pygame.draw.circle(vscreen, (255, 255, 255), (node.node_x, node.node_y), 30) # red, green, blue - x, y - radius
-                    font = pygame.font.SysFont(None, 15) # default font, size 15
-                    text_surface = font.render(f"{node.encounter_type} {node.layer}, {node.layer_index}", True, (0, 0, 0))
-                    text_rect = text_surface.get_rect(center=(node.node_x, node.node_y))
-                    vscreen.blit(text_surface, text_rect)
+                #difference_from_origin_point_to_center_of_icon:
+                #origin_point_to_center = (2*node_radius*node_radius)**0.5 #since the node is a cricle but drawn from the corner, I had to do some pythagorean theorem to figure out how much I need to shift the icon
+                #Yeah, so that didn't fucking work. I am leaving it here as a monument to my own overthinkingness
 
-                if node is Player.current_node: # if the node and the player's current node are the same
-                    pygame.draw.circle(vscreen, (255, 215, 0), (node.node_x, node.node_y), 35, 3)  # highlighted with yellow
+
+                pygame.draw.circle(vscreen, (50, 158, 255), (x, y), node_radius)
+                vscreen.blit(icon, (x - icon.get_width() // 2, y - icon.get_height() // 2))  # Center the icon on the node
+
+                #font = pygame.font.SysFont(None, 16)
+                #label = node.encounter_type if node.encounter_type in ("start", "boss") else f"{node.encounter_type} {node.layer}, {node.layer_index}"
+                #text_surface = font.render(label, True, text_color)
+                #text_rect = text_surface.get_rect(center=(x, y))
+                #vscreen.blit(text_surface, text_rect)
+
+                if node is Player.current_node:
+                    pygame.draw.circle(vscreen, (255, 215, 0), (x, y), node_radius + 6, 4)
 
     def draw_hand(self,vscreen, hand, start_x, start_y, end_x): # reused from dev_draw_hand, that's why there is card_width even though I don't set it.
         card_width = 230 #I checked and that is the width of the images once transformed, and since I don't plan to ever change how big the cards will be it's okay to just set it here instead of passing it as a parameter like dev_draw_hand
@@ -1120,14 +1234,10 @@ class node_generation_or_something_idk:
         Enemy_status_center_x = Enemy_status_surface.get_width() / 2
 
         Status_backround = pygame.Rect(2000 + Enemy_center_x - Enemy_status_center_x, 320, Enemy_status_surface.get_width(), 70)  # x, y, width, height
-        pygame.draw.rect(vscreen, (128, 128, 128), Status_backround) #blue backround for enemy status
+        pygame.draw.rect(vscreen, (128, 128, 128), Status_backround) #backround for enemy status
 
         vscreen.blit(Enemy_status_surface, (2000 + Enemy_center_x - Enemy_status_center_x, 320))  # Draw enemy status  -  I genuenly stared at the wall for like 3 minutes trying to figure out how to make it so both of their centers are on the same x coordinate
         vscreen.blit(Enemy_status_effects_surface, (2000 + Enemy_center_x - Enemy_status_center_x, 355))  # Draw enemy status effects  -  Status effects are not actually centered, but they begin at the same x as status so I think it's okay
-
-        
-
-
 
         my_font = pygame.font.SysFont("Verdana", 33)
         Enemy_move_surface = my_font.render(f"Enemy Move: {Enemy.enemy_move.name}, {Enemy.enemy_move.type}-{Enemy.enemy_move.power}", True, (255, 255, 255))  # White text
@@ -1144,7 +1254,7 @@ class node_generation_or_something_idk:
         vscreen.blit(Enemy_move_Effects_surface, (2000 + Enemy_center_x - Enemy_move_center_x, 435 + move_offset))  # Draw enemy move effects
 
         Player_status_box = pygame.Rect(1, 1400, 2560, 50)  # x, y, width, height
-        pygame.draw.rect(vscreen, (128, 128, 128), Player_status_box) 
+        pygame.draw.rect(vscreen, (128, 128, 128), Player_status_box)  #backround for player status
 
         my_font = pygame.font.SysFont("Verdana", 30)
         Player_status_surface = my_font.render(f"{Player.name}) HP:{Player.HP}/{Player.maxHP} STR:{Player.STR} DEF:{Player.DEF} Block:{Player.block} Pending Damage:{Player.pending_damage} Energy:{Player.Energy}/{Player.MaxEnergy} Effects:{Player.status_effects}", True, (255, 255, 255))  # White text
@@ -1165,12 +1275,69 @@ class node_generation_or_something_idk:
         vscreen.blit(energy_count_shade, (1280-x, 1309-y)) # Draws a shade to make it pop a little, plus it looks a little better
         vscreen.blit(energy_count, (1280-x, 1309-y))  # Draw Player.energy, made it a little higher since it looked a little off even though it isn't centered
         
+        my_font = pygame.font.SysFont("Verdana", 30) # draw a count of your money
+        money_count = my_font.render(f"{Player.money}$", True, (255,255,0))
+        vscreen.blit(money_count, (10, 10)) # Draw Player.money in the top left corner, and this time the fact pygame renders from the left corner actually helps since it as the width grows it just goes more to the right where it's supposed to go
+
         pygame.draw.circle(vscreen, (0, 0, 0), (2250, 1230), 104) # ouline for end turn button
         pygame.draw.circle(vscreen, (200, 210, 0), (2250, 1230), 100) # end turn button
 
         my_font = pygame.font.SysFont("Verdana", 35)
         end_turn_label = my_font.render("END TURN", True, (0, 0, 0))
         vscreen.blit(end_turn_label, (2250 - end_turn_label.get_width() / 2, 1230 - end_turn_label.get_height() / 2)) # Draw end turn button, centered on the circle
+
+        
+        my_font = pygame.font.SysFont("Verdana", 50)  #displaying the raw strenght of the enemy move since that's pretty much the only thing the player needs to care about
+        if "ATK" == Enemy.enemy_move.type:
+            Enemy_move_strenght = Enemy.enemy_move.power + Enemy.DEF
+            Enemy_move_strenght = str(Enemy_move_strenght) # converting to a string because pythone is stupid and won't convert it automattically when it needs to render it. Like I said before, code should be executed by genetically modified hamsters
+            
+            Enemy_strenght_label = my_font.render(Enemy_move_strenght, True, (255, 0, 0))  # Red text
+
+            if "multihit" in Enemy.enemy_move.tags:
+                Enemy_strenght_label = my_font.render(f"{Enemy_move_strenght} x{Enemy.enemy_move.tags['multihit']}", True, (255, 0, 0))  # Red text with multihit multiplier
+
+            vscreen.blit(Enemy_strenght_label, (1810 , 710)) 
+            vscreen.blit(Images["ATK_Icon.png"], (1810 + Enemy_strenght_label.get_width(), 712)) 
+
+        elif "DEF" == Enemy.enemy_move.type:
+            Enemy_move_strenght = Enemy.enemy_move.power + Enemy.STR
+            Enemy_move_strenght = str(Enemy_move_strenght)
+
+            Enemy_strenght_label = my_font.render(Enemy_move_strenght, True, (255, 0, 0))  # Red text
+
+            vscreen.blit(Enemy_strenght_label, (1810 , 710)) 
+            vscreen.blit(Images["DEF_Icon.png"], (1810 + Enemy_strenght_label.get_width(), 712)) 
+
+        elif "STRup" == Enemy.enemy_move.type:
+            Enemy_move_strenght = Enemy.enemy_move.power
+            Enemy_move_strenght = str(Enemy_move_strenght)
+
+            Enemy_strenght_label = my_font.render(Enemy_move_strenght, True, (255, 0, 0))  # Red text
+
+            vscreen.blit(Enemy_strenght_label, (1810 , 710)) 
+            vscreen.blit(Images["STRup_Icon.png"], (1810 + Enemy_strenght_label.get_width(), 712)) 
+
+        elif "DEFup" == Enemy.enemy_move.type:
+            Enemy_move_strenght = Enemy.enemy_move.power
+            Enemy_move_strenght = str(Enemy_move_strenght)
+
+            Enemy_strenght_label = my_font.render(Enemy_move_strenght, True, (255, 0, 0))  # Red text
+
+            vscreen.blit(Enemy_strenght_label, (1810 , 710)) 
+            vscreen.blit(Images["DEFup_Icon.png"], (1810 + Enemy_strenght_label.get_width(), 712))  
+
+        player_block_label = my_font.render(f"{Player.block}", True, (0, 0, 250))  # Blue text for player block
+        vscreen.blit(player_block_label, (200 + Images[Player.image_name].get_width() + 20, 710)) 
+
+        my_font = pygame.font.SysFont("Verdana", 30)
+
+        player_hp_label = my_font.render(f"{Player.HP}/{Player.maxHP}", True, (250, 0, 0))  # Green text for player HP
+        vscreen.blit(player_hp_label, (200 + Images[Player.image_name].get_width()/2 - player_hp_label.get_width()/2, 370))
+
+      
+
+
 
         game_states.draw_hand(vscreen, hand, 400, 900, 2160)  # Draw player's hand - start x, start y, width, height - vscreen resolustion: (2560x1440)
 
@@ -1212,7 +1379,7 @@ class node_generation_or_something_idk:
 
 
     def draw_card_choice(self):
-        pygame.draw.rect(vscreen, (20, 20, 20), (0, 0, 2560, 1440))  # blue background for card choice
+        pygame.draw.rect(vscreen, (20, 20, 20), (0, 0, 2560, 1440))  
 
         my_font = pygame.font.SysFont("Verdana", 50)
         label_surface = my_font.render("Choose a new card to add to your pool", True, (255, 255, 255))  # White text
@@ -1272,15 +1439,14 @@ class node_generation_or_something_idk:
                                 game.assign_new_enemy()
                                 Player.make_hand()
                                 
-                                if dev_mode == True:
-                                    game_state = "dev_figth"
-                                else:
-                                    game_state = "fight"
+
+                                game_state = "fight"
                             
                             elif node.encounter_type == "rest":
                                 game_state = "rest"
-
-
+                            
+                            elif node.encounter_type == "shop":
+                                game_states.prepare_shop()
                                 
 
 
@@ -1288,61 +1454,184 @@ class node_generation_or_something_idk:
                             print("You can't move to that node from your current position.")
 
 
-
     def draw_rest(self):
-        x=Player.maxHP * 0.2
-        x = round(x)
+        heal_by = Player.maxHP * 0.2
+        heal_by = round(heal_by)
+        if heal_by + Player.HP > Player.maxHP:
+            heal_by = Player.maxHP - Player.HP
 
+        vscreen.blit(Images["Place_Holder_Rest_Background.jpg"], (0, 0))  # Draw rest background. So far a placeholder. And a shitty one at that
 
-        pygame.draw.rect(vscreen, (0, 255, 0), (500, 500, 400, 100))  # Big green heal button
-        font = pygame.font.SysFont(None, 36)
-        text_surface = font.render(f"heal for 20% of max HP({x})", True, (0, 0, 0))  # Black text
+        my_font = pygame.font.SysFont(None, 36)
+        
+        pygame.draw.rect(vscreen, (5, 222, 5), (500, 500, 400, 100))  # Big green heal button
+        text_surface = my_font.render(f"heal for 20% of max HP({heal_by})", True, (0, 0, 0))  # Black text
         text_rect = text_surface.get_rect(center=(700, 540))
         vscreen.blit(text_surface, text_rect)
 
-        pygame.draw.rect(vscreen, (255, 255, 255), (600, 650, 200, 80))  # White continue button
-        text_surface = font.render("continue", True, (0, 0, 0))  # Black text
+        pygame.draw.rect(vscreen, (240, 240, 240), (500, 650, 400, 100))  # White upgrade button
+        text_surface = my_font.render("Upgrade", True, (0, 0, 0))  # black text
         text_rect = text_surface.get_rect(center=(700, 690))
         vscreen.blit(text_surface, text_rect)
 
-        pygame.draw.rect(vscreen, (0, 128, 255), (0, 0, 800, 40))  # blue player info button
-        font = pygame.font.SysFont(None, 20)
-        text_surface = font.render(f"{Player}", True, (255, 255, 255))  # White text
-        vscreen.blit(text_surface, (10, 10))
+        my_font = pygame.font.SysFont(None, 80)
+        pygame.draw.rect(vscreen, (255, 255, 255), (2560 -500 -400, 500, 400, 250))  # White continue button (2560x1440), same distance from the edge as the other two buttons
+        text_surface = my_font.render("Continue", True, (0, 0, 0))  # Black text
+        text_rect = text_surface.get_rect(center=(2560 -500 -400//2, 500 + 250//2))
+        vscreen.blit(text_surface, text_rect)
 
-        pygame.draw.rect(vscreen, (255, 255, 255), (550, 800, 300, 50))  # White upgrade button - so far not implemented
-        font = pygame.font.SysFont(None, 18)
-        text_surface = font.render("Upgrade- PLACEHOLDER, NOT IMPLEMENTED", True, (0, 0, 0))  # black text
-        vscreen.blit(text_surface, (560, 810))
+
+        Player_status_box = pygame.Rect(1, 1400, 2560, 50)  # x, y, width, height
+        pygame.draw.rect(vscreen, (128, 128, 128), Player_status_box)  #backround for player status
+
+        my_font = pygame.font.SysFont("Verdana", 30)
+        Player_status_surface = my_font.render(f"{Player.name}) HP:{Player.HP}/{Player.maxHP} STR:{Player.STR} DEF:{Player.DEF} Block:{Player.block} Pending Damage:{Player.pending_damage} Energy:{Player.Energy}/{Player.MaxEnergy} Effects:{Player.status_effects}", True, (255, 255, 255))  # White text
+        vscreen.blit(Player_status_surface, (10, 1403))  # Draw player status
+
+
+        # Only run the heal animation if it's playing
+        if heal_animation_playing:
+            game_states.draw_heal_animation()
 
 
     def handle_rest_logic(self):
-        global game_state
-        global rest_done # False by default
+        global spent_rest, game_state
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             heal_button_rect = pygame.Rect(500, 500, 400, 100)
-            continue_button_rect = pygame.Rect(600, 650, 200, 80)
+            upgrade_button_rect = pygame.Rect(500, 650, 400, 100)
+            continue_button_rect = pygame.Rect(2560 -500 -400, 500, 400, 250)
 
             if heal_button_rect.collidepoint(event.pos):
-                x = Player.maxHP * 0.2
-                x = round(x)
-                Player.HP += x
-                if Player.HP > Player.maxHP:
-                    Player.HP = Player.maxHP
-                print(f"{Player.name} healed for {x} HP! Current HP: {Player.HP}")
+                if spent_rest == False:
+                    x = Player.maxHP * 0.2
+                    x = round(x)
+                    Player.HP += x
+                    if Player.HP > Player.maxHP:
+                        Player.HP = Player.maxHP
+                    print(f"{Player.name} healed for {x} HP! Current HP: {Player.HP}")
+                    spent_rest = True
+                    # start heal animation (modify the module-level flag)
+                    global heal_animation_playing, particle_alpha, set_up_heal_animation
+                    heal_animation_playing = True
+                    set_up_heal_animation = True
+                    particle_alpha = 255
+                else:
+                    print("You have already healed at this rest stop.")
 
-                rest_done = True
+
+            elif upgrade_button_rect.collidepoint(event.pos):
+                if spent_rest == False:
+                    self.prepare_rest_upgrade()
 
             elif continue_button_rect.collidepoint(event.pos):
-                if rest_done == False:
-                    print("It would be a shame to waste this rest, take another action before continuing the journey.")
+                print("Continuing the journey...")
+                spent_rest = False
+                heal_animation_playing = False
+                game_state = "map"
+            
+    def draw_heal_animation(self): #Spawns a heal parcticle that progresively moves down and more transparent
+        global particle_alpha
+        global set_up_heal_animation
+        global particle_x
+        global particle_y
+        global heal_animation_playing
+
+
+        if heal_animation_playing == True: # animate while playing
+            if set_up_heal_animation == True:
+                # Spawn the particle at the heal button center instead of relying on event.pos
+                particle_x, particle_y = event.pos
+                particle_x -= Images["Heal_Particle.png"].get_width() // 2
+                particle_y -= Images["Heal_Particle.png"].get_height() // 2
+                set_up_heal_animation = False
+            particle_y += 1.5  # Move the particle downwards
+            particle_alpha -= 6  # Decrease alpha to make it more transparent
+            heal_particle = Images["Heal_Particle.png"].copy()
+            heal_particle.set_alpha(int(particle_alpha))
+            vscreen.blit(heal_particle, (particle_x, particle_y))  # Draw the heal particle
+            if particle_alpha <= 0:
+                particle_alpha = 255  # Reset alpha for the next time the animation is triggered
+                set_up_heal_animation = True  # Reset setup for the next time the animation is triggered
+                heal_animation_playing = False  # End the animation
+
+    def prepare_rest_upgrade(self):
+        global rest_upgrade_choices
+        global draw_upgrade_potential
+        global upgrade_potential_pos
+        global pre_upgrade_potential
+        global upgrade_potential
+        global game_state
+
+        print("Preparing rest upgrade choices...")
+        rest_upgrade_choices = random.sample(Kori_pool, 3)
+
+        game_state = "rest_upgrade"
+
+    def draw_rest_upgrade(self):
+        game_states.draw_hand(vscreen, rest_upgrade_choices, 500, 720, 2700) # start x, start y, end x - vscreen resolustion: (2560x1440)
+
+        my_font = pygame.font.SysFont("Verdana", 50)
+        label_surface = my_font.render("Choose a card to upgrade", True, (255, 255, 255))  # White text
+        vscreen.blit(label_surface, (1280 - label_surface.get_width() / 2, 500))  # Centered at the top of the screen
+
+        if draw_upgrade_potential == True:
+            potential_surface = my_font.render(f"{pre_upgrade_potential} -> {upgrade_potential}", True, (255, 255, 255))  # White text
+            vscreen.blit(potential_surface, (upgrade_potential_pos))  # Draw potential near the mouse cursor
+            
+
+
+    def handle_rest_upgrade_logic(self):
+        global draw_upgrade_potential 
+        global upgrade_potential
+        global pre_upgrade_potential
+        global upgrade_potential_pos
+        global game_state
+        global spent_rest
+
+        start_x = 500
+        end_x = 2700
+        card_width = 230
+
+        for i, card in enumerate(rest_upgrade_choices): 
+            L = end_x - start_x # total length
+        
+            spacing = (L - len(rest_upgrade_choices)*card_width) / (len(rest_upgrade_choices) + 1) # adaptive spacing based on number of cards
+
+            clicking_rect = pygame.Rect(start_x + i *(230 + spacing), 720, 230, 307)  # x, y, width, height - matches the position and size of the card images drawn in draw_fight
+
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if clicking_rect.collidepoint(event.pos):
+                    print(f"Clicked on card: {card.name}")
+                    print(f"upgrading {card.name}...")
+                    card.upgrade()
+                    print(f"{card.name} has been upgraded! New stats: {card.type}-{card.power}")
+                    game_state = "rest"
+                    spent_rest = True # so that you can't heal after upgrading, since that would be pretty busted ngl
+                    
+
+
+            if event.type == pygame.MOUSEMOTION:  # Check for mouse movement because pygame is stupid and will cry like a little baby if you try to get position of a keypress
+                
+                if clicking_rect.collidepoint(event.pos):
+                    draw_upgrade_potential = True
+                    pre_upgrade_potential = card.power
+
+                    if "spell" == card.type:
+                        upgrade_potential = 0 #spells only cary tags and don't do anything, so upgrading their power is pointless
+                    else:
+                        upgrade_potential = card.power + 4 + card.power*0.2 #how much the card could be upgraded
+                        upgrade_potential = round(upgrade_potential)
+                        
+                    upgrade_potential_pos = event.pos
+                    
+                    break # That break has to be here because otherwise it would go check the next card and go "Oh, I am not coliding, I will proceed to set the "am I colliding" to False. I am very good at this job and shouldn't be replaced by a genetically modified hamster, thank you very much"
                 else:
-                    print("Continuing the journey...")
-                    game_state = "map"
-                    rest_done = False
-
-
+                    draw_upgrade_potential = False
+                         
+                
+    
 
 
     def prepare_shop(self): # only once per shop visit, makes inventory
@@ -1356,70 +1645,13 @@ class node_generation_or_something_idk:
 
 
     def draw_shop(self):
-        
-        for i, card in enumerate(shop_offers):
-            pygame.draw.rect(vscreen, (255, 255, 255), (150*2 + i * 130*2, 300*2, 120*2, 50*2)) # same as draw hand but multiplied by 2 to make it bigger, I guess it's less efficient but it's easier to implement and won't even end up in the final game, I hope
-            font = pygame.font.SysFont(None, 24)
-            text_surface = font.render(f"{card.name} - 10$", True, (0, 0, 0))
-            text_rect = text_surface.get_rect(center=(150*2 + i * 130*2 + 60*2, 300*2 + 25*2))
-            vscreen.blit(text_surface, text_rect)
+        pass
 
-        pygame.draw.rect(vscreen, (0, 255, 0), (1280 - 200, 900, 400, 150))  # buy medical supplies button
-        font = pygame.font.SysFont(None, 32)
-        text_surface = font.render(f"buy medical supplies (plus 20% HP {round(Player.maxHP * 0.2)}) - 10$", True, (255, 255, 255))  # white text
-        text_rect = text_surface.get_rect(center=(1280 - 200 + 200, 900 + 75))
-        vscreen.blit(text_surface, text_rect)
 
-        pygame.draw.rect(vscreen, (255, 255, 255), (1280 - 200, 1100, 400, 80))  # continue button
-        font = pygame.font.SysFont(None, 36)
-        text_surface = font.render("Continue", True, (0, 0, 0))
-        text_rect = text_surface.get_rect(center=(1280 - 200 + 200, 1100 + 40))
-        vscreen.blit(text_surface, text_rect)
 
-        pygame.draw.rect(vscreen, (0, 128, 255), (0, 0, 800, 40))  # blue player info button
-        font = pygame.font.SysFont(None, 20)
-        text_surface = font.render(f"{Player}", True, (255, 255, 255))  # White text
-        vscreen.blit(text_surface, (10, 10))
 
     def handle_shop_logic(self):
-        global game_state
-        global Player
-        global cost_of_cards
-        global cost_of_supplies
-
-
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            for i, card in enumerate(shop_offers):
-                card_rect = pygame.Rect(150*2 + i * 130*2, 300*2, 120*2, 50*2) 
-                if card_rect.collidepoint(event.pos):
-                    if Player.money >= cost_of_cards:
-                        Player.pool.append(card) # append means add
-                        Player.money -= cost_of_cards
-                        print(f"Purchased {card.name} for {cost_of_cards}$. Remaining money: {Player.money}")
-                    else:
-                        print("Not enough money to purchase this card.")
-
-            buy_supplies_rect = pygame.Rect(1280 - 200, 900, 400, 150)
-            continue_rect = pygame.Rect(1280 - 200, 1100, 400, 80)
-
-            if buy_supplies_rect.collidepoint(event.pos):
-    
-                if Player.money >= cost_of_supplies:
-                    Player.money -= cost_of_supplies
-                    heal_amount = round(Player.maxHP * 0.2)
-                    Player.HP += heal_amount
-                    if Player.HP > Player.maxHP:
-                        Player.HP = Player.maxHP
-                    print(f"Purchased medical supplies for {cost_of_supplies}$. Healed for {heal_amount} HP. Current HP: {Player.HP}. Remaining money: {Player.money}")
-                else:
-                    print("Not enough money to buy medical supplies.")
-
-            elif continue_rect.collidepoint(event.pos):
-                print("Leaving the shop and continuing the journey...")
-                game_state = "map"
-
-    
-
+        pass
 
 
 
@@ -1535,7 +1767,7 @@ def draw_error_screen():
 def handle_error_screen_logic(): #If you click, it exits the game since there is nothng else to do
     if event.type == pygame.MOUSEBUTTONDOWN:
         pygame.quit()
-        sys.exit()
+        
 
 hand_start_x = 200
 hand_start_y = 500
@@ -1551,8 +1783,12 @@ enemy_move = Enemy.make_enemy_move()
 while True:
     vscreen.fill((0, 0, 0))
 
-    if game_state == "dev_figth":
-        dev_draw_fight()
+    if game_state == "fight":
+        if dev_mode == True:
+            dev_draw_fight()
+
+        elif dev_mode == False:
+            game_states.draw_fight()
 
     elif game_state == "choose_new_card":
         game_states.draw_card_choice()
@@ -1563,11 +1799,13 @@ while True:
     elif game_state == "rest":
         game_states.draw_rest()
 
+    elif game_state == "rest_upgrade":
+        game_states.draw_rest_upgrade()
+
     elif game_state == "shop":
         game_states.draw_shop()
 
-    elif game_state == "fight":
-        game_states.draw_fight()
+
     
 
     else:
@@ -1578,7 +1816,8 @@ while True:
     if settings == True:
         game.draw_settings()
 
-        
+    if Player.alive == False: 
+        Player.draw_defeat_screen()
 
 
 
@@ -1587,14 +1826,21 @@ while True:
         transform_mouse_pos()
         if event.type == pygame.QUIT:  
             pygame.quit()
-            sys.exit()
+            
 
         game.go_to_settings()
 
 
 
-        if game_state == "dev_figth":
-            game.dev_handle_basic_logic()
+        if game_state == "fight":
+            if dev_mode == True:
+                game.dev_handle_basic_logic()
+            elif dev_mode == False:
+                if Player.alive == False: #disables logic if you are dead
+                    pass
+                else:
+                    game_states.handle_fight_logic()
+
 
         elif game_state == "choose_new_card":
             game_states.handle_card_choice_logic()
@@ -1604,21 +1850,27 @@ while True:
         
         elif game_state == "rest":
             game_states.handle_rest_logic()
+
+        elif game_state == "rest_upgrade":
+            game_states.handle_rest_upgrade_logic()
         
         elif game_state == "shop":
             game_states.handle_shop_logic()
 
-        elif game_state == "fight":
-            game_states.handle_fight_logic()
 
 
         else: 
             handle_error_screen_logic()
 
 
-        
-        if settings == True: #overlays on top of everything else
+        #overlays on top of everything else:
+        if settings == True: 
             game.handle_settings()
+
+        if Player.alive == False:
+            Player.handle_defeat_screen_click()
+
+    
 
 
 
