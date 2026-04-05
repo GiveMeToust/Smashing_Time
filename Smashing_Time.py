@@ -73,6 +73,7 @@ list_of_ATK_and_DEF_icons = [
 List_of_backrounds = [
     "Battle_Background.png",
     "Place_Holder_Rest_Background.jpg",
+    "Shop_Backround.png"
 ]
 
 List_of_characters = [
@@ -1645,7 +1646,16 @@ class node_generation_or_something_idk:
 
 
     def draw_shop(self):
-        pass
+        global shop_offers
+
+        vscreen.blit(Images["Shop_Backround.png"], (0, 0))
+        for i, card in enumerate(shop_offers):
+            if i == 0:
+                print("0")
+                print(card)
+            if i == 1:
+                print("1")
+                print(card)
 
 
 
