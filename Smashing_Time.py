@@ -1651,12 +1651,17 @@ class node_generation_or_something_idk:
         vscreen.blit(Images["Shop_Backround.png"], (0, 0))
         for i, card in enumerate(shop_offers):
             if i == 0:
-                print("0")
-                print(card)
-            if i == 1:
-                print("1")
-                print(card)
-
+                vscreen.blit(Images[card.name], (400,400))
+            eliif i == 1:
+                vscreen.blit(Images[card.name] (400.200))
+            eliif i == 2:
+                vscreen.blit(Images[card.name] (800.200))
+            eliif i == 3:
+                vscreen.blit(Images[card.name] (1000.200))
+            eliif i == 4:
+                vscreen.blit(Images[card.name] (1200.200))
+            eliif i == 5:
+                vscreen.blit(Images[card.name] (1200.400))
 
 
 
