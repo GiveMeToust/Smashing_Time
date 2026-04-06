@@ -13,7 +13,7 @@ print("hello world")
 
 #     Loading assets here:
 
-Images = {}  # Dictionary to hold loaded images
+Images = {}  # Dictionary to hold loaded imagvenv\Scripts\activatees
 
 BASE_DIR = os.path.dirname(__file__)
 ART_ASSETS_DIR = os.path.join(BASE_DIR, "Art_Assets")
@@ -130,7 +130,7 @@ for character in List_of_characters: # the construct is a little taller than int
 
 for card in List_of_cards:
     if card in the_weird_ones: #some of the cards have different resolutions for some reason, so I had to scale them differently, I don't know why this happened since they should all be the same, but I am not getting paid enough to care
-        transform_images(card, 0.1924) #compleately eyeballed it, but it looks identical to the other cards. If it's stupid but works, it's not stupid. Also I checked and they get scalled to the same width so it functionally works
+        transform_images(card, 0.1924) #compleately eyeballed it, but it looks identical to the other cards. If it's stupid but works, it's not stupid. Also I checked and they get scalled to the same width so it functionally works. 
     else:
         transform_images(card, 0.15)
 
@@ -158,7 +158,6 @@ for icon in list_of_ATK_and_DEF_icons:
 
 for particle in list_of_paricles:
     transform_images(particle, 0.5)
-
 
 my_font = pygame.font.SysFont("Verdana", 36)  # 36 px Verdana
 
@@ -1558,10 +1557,6 @@ class node_generation_or_something_idk:
 
     def prepare_rest_upgrade(self):
         global rest_upgrade_choices
-        global draw_upgrade_potential
-        global upgrade_potential_pos
-        global pre_upgrade_potential
-        global upgrade_potential
         global game_state
 
         print("Preparing rest upgrade choices...")
@@ -1638,8 +1633,16 @@ class node_generation_or_something_idk:
     def prepare_shop(self): # only once per shop visit, makes inventory
         global shop_offers
         global game_state
+        global shop_prices
 
-        shop_offers = random.sample(floor1_loot, 5)
+        shop_offers = random.sample(floor1_loot, 7) # More than the number displayed in the shop, but as you buy one and remove it from there, the 7th one will get revealed and replace the mising one
+        shop_prices = { 0 : 0 }
+
+        for card in shop_offers:
+            cost = random.randint(3,6)
+            cost = 5*cost
+            shop_prices[card] = cost
+
 
         game_state = "shop"
 
@@ -1647,26 +1650,107 @@ class node_generation_or_something_idk:
 
     def draw_shop(self):
         global shop_offers
+        global shop_prices
+
+        print(shop_prices)
 
         vscreen.blit(Images["Shop_Backround.png"], (0, 0))
         for i, card in enumerate(shop_offers):
             if i == 0:
-                vscreen.blit(Images[card.name], (400,400))
-            eliif i == 1:
-                vscreen.blit(Images[card.name] (400.200))
-            eliif i == 2:
-                vscreen.blit(Images[card.name] (800.200))
-            eliif i == 3:
-                vscreen.blit(Images[card.name] (1000.200))
-            eliif i == 4:
-                vscreen.blit(Images[card.name] (1200.200))
-            eliif i == 5:
-                vscreen.blit(Images[card.name] (1200.400))
+                game_states.draw_individual_card(330, 830, card)
+            elif i == 1:
+                game_states.draw_individual_card(270, 390, card)
+            elif i == 2:
+                game_states.draw_individual_card(695, 385, card)
+            elif i == 3:
+                game_states.draw_individual_card(1100, 365, card)
+            elif i == 4:
+                game_states.draw_individual_card(1480, 354, card)
+            elif i == 5:
+                game_states.draw_individual_card(1400, 750, card)
+
+    def draw_individual_card(self,x,y,card): # Modified draw_hand for only 1 card, only used in draw_shop since it has iregular placment of purchusable cards (Thanks Adela, no really I think it looks better)
+
+        my_font = pygame.font.SysFont("Verdana", 36)  # 36 px Verdana
+
+        vscreen.blit(Images[card.image_name],(x, y))  # Draw card image at calculated position
+
+        move_name_surface = my_font.render(card.name, True, (255, 255, 255))  # White text
+        vscreen.blit(move_name_surface, (4 + x, y - 41))  # Draw move name above the card
+
+        my_font = pygame.font.SysFont("Verdana", 38)  # setting it slightly bigger for the outline, only works on single characters because math or something, idk I guess you could do it if you individually rendered each character, but it's not like It's all that important for anything aside from the stuff drawn on the moves themselves
+        #Actually, I think it's still offset because pygame renders stuff from the top left corner and not the center, but it still gives it a "shade" if the "outline" isn't too much bigger
+
+        move_cost_surface_outline = my_font.render(f"{card.cost}", True, (0, 0, 0))  # black outline
+        vscreen.blit(move_cost_surface_outline, (206 + x, y - 8))  
+
+        my_font = pygame.font.SysFont("Verdana", 36)  # setting back to normal
+
+        move_cost_surface = my_font.render(f"{card.cost}", True, (245, 215, 125))  # tan-yellow text
+        vscreen.blit(move_cost_surface, (206 + x, y - 8))  # Draw move cost below the move name
+
+        move_stats_surface = my_font.render(f"{card.type}-{card.power}", True, (255, 255, 255))  # White text
+        vscreen.blit(move_stats_surface, (4 + x, y + 303))  # Draw move type and power bellow cards
+        
+
+        my_font = pygame.font.SysFont("Verdana", 100)
+        card_cost_surface = my_font.render(str(shop_prices[card]), True, (255, 255, 100))
+        
+        image = Images[card.image_name]
+
+        vscreen.blit(card_cost_surface, (x + image.get_width() / 2 - card_cost_surface.get_width() / 2, y + image.get_height() / 2 - card_cost_surface.get_height()/2 )) # the cost of a card in a shop
+
+        my_font = pygame.font.SysFont("Verdana", 36)
+
+        if card.tags:
+            if "multihit" in card.tags:
+                move_tags_surface = my_font.render(f"Multihit: {card.tags['multihit']}", True, (255, 255, 255))  # White text
+                vscreen.blit(move_tags_surface, (4 + x, y + 343))  # Draw move tags below type and power
+            
+            elif "poison" in card.tags:
+                move_tags_surface = my_font.render(f"Poison: {card.tags['poison']}", True, (255, 255, 255))  # White text
+                vscreen.blit(move_tags_surface, (4 + x, y + 343))  # Draw move tags below type and power
+
+            elif "draw" in card.tags:
+                move_tags_surface = my_font.render(f"Draw: {card.tags['draw']}", True, (255, 255, 255))  # White text
+                vscreen.blit(move_tags_surface, (4 + x, y + 343))  # Draw move tags below type and power
+            
+            elif "redraw" in card.tags:
+                move_tags_surface = my_font.render(f"Redraw", True, (255, 255, 255))  # White text
+                vscreen.blit(move_tags_surface, (4 + x, y + 343))  # Draw move tags below type and power
+            
+            elif "energise" in card.tags:
+                move_tags_surface = my_font.render(f"Energise: {card.tags['energise']}", True, (255, 255, 255))  # White text
+                vscreen.blit(move_tags_surface, (4 + x, y + 343))  # Draw move tags below type and power
+
+            elif "enrage" in card.tags:
+                move_tags_surface = my_font.render(f"Enrage", True, (255, 255, 255))  # White text
+                vscreen.blit(move_tags_surface, (4 + x, y + 343))  # Draw move tags below type and power
+            
 
 
 
     def handle_shop_logic(self):
-        pass
+        global shop_offers
+        card_dimensions = 230, 307 #dimensions of a card so I don't have to type it all individually, have to put a * before it to "unpack" it or something 
+
+        for i, card in enumerate(shop_offers):
+            if i == 0:
+                individual_card_clicking_surface = pygame.Rect(330, 830, *card_dimensions)
+            elif i == 1:
+                individual_card_clicking_surface = pygame.Rect(270, 390, *card_dimensions)
+            elif i == 2:
+                individual_card_clicking_surface = pygame.Rect(695, 385, *card_dimensions)
+            elif i == 3:
+                individual_card_clicking_surface = pygame.Rect(1100, 365, *card_dimensions)
+            elif i == 4:
+                individual_card_clicking_surface = pygame.Rect(1480, 354, *card_dimensions)
+            elif i == 5:
+                individual_card_clicking_surface = pygame.Rect(1400, 750, *card_dimensions)
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if individual_card_clicking_surface.collidepoint(event.pos):
+                    pass
 
 
 
@@ -1792,6 +1876,8 @@ end_x= 800
 
 
 enemy_move = Enemy.make_enemy_move()
+
+game_states.prepare_shop()
 
 #------------------------------- Main Loop -------------------------------
 
