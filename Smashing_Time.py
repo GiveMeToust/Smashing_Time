@@ -535,10 +535,11 @@ class player(champion):
     def handle_defeat_screen_click(self):
         global frame_delay
 
-        if frame_delay == True: # this happens on the same frame as you hit the end turn button, so you would immidietly also quit from the game. I added this one frame delaay to prevent this
+        if frame_delay == True: # this happens on the same frame as you hit the end turn button, so you would immidietly also quit from the game. I added this one frame delay to prevent this
             if event.type == pygame.MOUSEBUTTONDOWN:
                 print("Quitting game from defeat screen...")
-                pygame.quit()
+                pygame.quit() #Just closes the window, technically not required
+                exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
                 
         frame_delay = True    
 
@@ -554,7 +555,7 @@ Player = copy.deepcopy(Kori)
 class foe(champion):
     def __init__(self, name, maxHP, STR, DEF, pool, poolname, status_effects, image_name):
         super().__init__(name, maxHP, STR, DEF, pool, poolname, status_effects, image_name)  
-    
+        self.pending_block = 0
 
 
     def __repr__(self):
@@ -580,7 +581,7 @@ class foe(champion):
                 else:
                     Player.pending_damage += enemy_move.power + self.STR
             elif enemy_move.type == "DEF":
-                self.block += enemy_move.power + self.DEF
+                self.pending_block += enemy_move.power + self.DEF
             elif enemy_move.type == "STRup":
                 self.STR += enemy_move.power
             elif enemy_move.type == "DEFup":
@@ -612,6 +613,8 @@ class foe(champion):
 
         print(f"{self.name} used {enemy_move.name}!")
 
+    def get_block(self):
+        self.block = self.pending_block
     
 
 
@@ -813,7 +816,8 @@ class gameloop:
             elif exit_button.collidepoint(event.pos):
                 print()
                 print("Exit button clicked!")
-                pygame.quit()
+                pygame.quit() #Just closes the window, technically not required
+                exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
                 
             
             elif gimme_money.collidepoint(event.pos):
@@ -869,12 +873,9 @@ class gameloop:
 
         Player.take_damage() 
 
-        Enemy.make_enemy_move()
-
-        Player.take_damage() 
+        Enemy.get_block() #from pending block into real block
 
         Enemy.make_enemy_move()
-
 
         Player.make_hand()
 
@@ -931,7 +932,8 @@ class gameloop:
         if event.type == pygame.MOUSEBUTTONDOWN:
             if quit_from_settings.collidepoint(event.pos):
                 print("Quitting game from settings...")
-                pygame.quit()
+                pygame.quit() #Just closes the window, technically not required
+                exit() #kill the program. EXTERMINATE! EXTERMINATE! EXTERMINATE!
                 
                 
             elif settings_dev_mode_toggle.collidepoint(event.pos):
@@ -1652,8 +1654,6 @@ class node_generation_or_something_idk:
         global shop_offers
         global shop_prices
 
-        print(shop_prices)
-
         vscreen.blit(Images["Shop_Backround.png"], (0, 0))
         for i, card in enumerate(shop_offers):
             if i == 0:
@@ -1693,7 +1693,7 @@ class node_generation_or_something_idk:
         vscreen.blit(move_stats_surface, (4 + x, y + 303))  # Draw move type and power bellow cards
         
 
-        my_font = pygame.font.SysFont("Verdana", 100)
+        my_font = pygame.font.SysFont("Verdana", 100) #drawing the price
         card_cost_surface = my_font.render(str(shop_prices[card]), True, (255, 255, 100))
         
         image = Images[card.image_name]
@@ -1732,6 +1732,8 @@ class node_generation_or_something_idk:
 
     def handle_shop_logic(self):
         global shop_offers
+        global shop_prices
+
         card_dimensions = 230, 307 #dimensions of a card so I don't have to type it all individually, have to put a * before it to "unpack" it or something 
 
         for i, card in enumerate(shop_offers):
@@ -1750,7 +1752,13 @@ class node_generation_or_something_idk:
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if individual_card_clicking_surface.collidepoint(event.pos):
-                    pass
+                    if Player.money >= shop_prices[card]:
+                        Player.pool.append(card)
+                        shop_offers.remove(card)
+                        Player.money -= shop_prices[card]
+                        print(f"Just bought {card} for {shop_prices[card]}, yepee! Current money: {Player.money}")
+                    else:
+                        print("not enough money, try again later, sucker")
 
 
 
@@ -1865,7 +1873,8 @@ def draw_error_screen():
 
 def handle_error_screen_logic(): #If you click, it exits the game since there is nothng else to do
     if event.type == pygame.MOUSEBUTTONDOWN:
-        pygame.quit()
+        pygame.quit() #Just closes the window, technically not required
+        exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
         
 
 hand_start_x = 200
@@ -1877,7 +1886,7 @@ end_x= 800
 
 enemy_move = Enemy.make_enemy_move()
 
-game_states.prepare_shop()
+#game_states.prepare_shop()
 
 #------------------------------- Main Loop -------------------------------
 
@@ -1926,7 +1935,8 @@ while True:
     for event in pygame.event.get():
         transform_mouse_pos()
         if event.type == pygame.QUIT:  
-            pygame.quit()
+            pygame.quit() #Just closes the window, technically not required
+            exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
             
 
         game.go_to_settings()
@@ -1979,3 +1989,12 @@ while True:
     transform_screen()
     pygame.display.flip()
     clock.tick(60)
+
+
+
+
+
+
+
+
+    print("I was *this* close to getting 2k lines of code. This close!")
