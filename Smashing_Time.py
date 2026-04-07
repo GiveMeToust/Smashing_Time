@@ -1,7 +1,8 @@
 import pygame
 import random
 import copy
-import os
+import os #for working with file paths
+import sys #for quiting the game because python is stupid and for some reason doesn't have a quit function
 
 
 
@@ -539,7 +540,7 @@ class player(champion):
             if event.type == pygame.MOUSEBUTTONDOWN:
                 print("Quitting game from defeat screen...")
                 pygame.quit() #Just closes the window, technically not required
-                exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
+                sys.exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
                 
         frame_delay = True    
 
@@ -817,7 +818,7 @@ class gameloop:
                 print()
                 print("Exit button clicked!")
                 pygame.quit() #Just closes the window, technically not required
-                exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
+                sys.exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
                 
             
             elif gimme_money.collidepoint(event.pos):
@@ -933,7 +934,7 @@ class gameloop:
             if quit_from_settings.collidepoint(event.pos):
                 print("Quitting game from settings...")
                 pygame.quit() #Just closes the window, technically not required
-                exit() #kill the program. EXTERMINATE! EXTERMINATE! EXTERMINATE!
+                sys.exit() #kill the program. EXTERMINATE! EXTERMINATE! EXTERMINATE!
                 
                 
             elif settings_dev_mode_toggle.collidepoint(event.pos):
@@ -1874,7 +1875,7 @@ def draw_error_screen():
 def handle_error_screen_logic(): #If you click, it exits the game since there is nothng else to do
     if event.type == pygame.MOUSEBUTTONDOWN:
         pygame.quit() #Just closes the window, technically not required
-        exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
+        sys.exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
         
 
 hand_start_x = 200
@@ -1936,7 +1937,7 @@ while True:
         transform_mouse_pos()
         if event.type == pygame.QUIT:  
             pygame.quit() #Just closes the window, technically not required
-            exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
+            sys.exit() #kill the program. EXTERMINATE. EXTERMINATE. EXTERMINATE.
             
 
         game.go_to_settings()
@@ -1996,5 +1997,4 @@ while True:
 
 
 
-
-    print("I was *this* close to getting 2k lines of code. This close!")
+print("I was *this* close to getting 2k lines of code. This close!")
