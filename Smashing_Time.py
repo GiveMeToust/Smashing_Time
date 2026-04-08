@@ -14,7 +14,7 @@ print("hello world")
 
 #     Loading assets here:
 
-Images = {}  # Dictionary to hold loaded imagvenv\Scripts\activatees
+Images = {}  # Dictionary to hold loaded images
 
 BASE_DIR = os.path.dirname(__file__)
 ART_ASSETS_DIR = os.path.join(BASE_DIR, "Art_Assets")
