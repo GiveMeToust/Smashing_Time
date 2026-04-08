@@ -323,7 +323,7 @@ explode_move = move("explode", "", 9999, "ATK", 0, tags={}) #that's a suprise to
                                                                 #I think I forgot to actually use this suprise tool, I think I meant to have the barrel use it when it explodes
 floor1_loot = [
     move("Smash", "Smash.jpg", 10, "ATK", 1, tags={}), #
-  #  move("Block", "Block.jpg", 4, "DEF", 0, tags={}), # ---------------------------------- missing texture, messes up the code without it
+  #  move("Block", "Block.jpg", 4, "DEF", 0, tags={}), # ---------------------------------- missing texture, messes up the code without it, unfortunatelly we didn't have the time to make the asset
     move("Power Up", "Power_Up.jpg", 5, "STRup", 1, tags={}), #
     move("Poison Strike", "Poison_Strike.jpg", 7, "ATK", 1, tags={"poison": 3}), ##damages enemy at the end of turn, then loses 1 poison
     move("Poison Bomb", "Poison_Bomb.jpg", 2, "ATK", 2, tags={"poison": 5}), #
