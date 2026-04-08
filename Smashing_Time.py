@@ -73,7 +73,7 @@ list_of_ATK_and_DEF_icons = [
 
 List_of_backrounds = [
     "Battle_Background.png",
-    "Place_Holder_Rest_Background.jpg",
+    "Rest_Backround.png",
     "Shop_Backround.png"
 ]
 
@@ -135,13 +135,14 @@ for card in List_of_cards:
     else:
         transform_images(card, 0.15)
 
-scale_for_place_holder = 2560/Images["Place_Holder_Rest_Background.jpg"].get_width() # the place holder background has a different resolution than the battle background, so I had to scale it differently to make it fit the screen, I don't know why this happened since they should all be the same, but I am not getting paid enough to care
-
-for background in List_of_backrounds:
-    if background == "Place_Holder_Rest_Background.jpg": # The place holder has worse resolution (not the same as vscreen) so it will scale badly as the pixels are partially stretched, but since it's a placeholder it's whatever
-        transform_images(background, scale_for_place_holder)
-    else:
-        transform_images(background, 1)
+#This is for when I used a placeholder because my art wasn't done yet.
+#scale_for_place_holder = 2560/Images["Place_Holder_Rest_Background.jpg"].get_width() # the place holder background has a different resolution than the battle background, so I had to scale it differently to make it fit the screen, I don't know why this happened since they should all be the same, but I am not getting paid enough to care
+#
+#for background in List_of_backrounds:
+#    if background == "Place_Holder_Rest_Background.jpg": # The place holder has worse resolution (not the same as vscreen) so it will scale badly as the pixels are partially stretched, but since it's a placeholder it's whatever
+#        transform_images(background, scale_for_place_holder)
+#    else:
+#        transform_images(background, 1)
 
 for icon in list_of_map_icons:
     if icon == "Start_Icon.png":
@@ -1463,7 +1464,7 @@ class node_generation_or_something_idk:
         if heal_by + Player.HP > Player.maxHP:
             heal_by = Player.maxHP - Player.HP
 
-        vscreen.blit(Images["Place_Holder_Rest_Background.jpg"], (0, 0))  # Draw rest background. So far a placeholder. And a shitty one at that
+        vscreen.blit(Images["Rest_Backround.png"], (0, 0))  # Draw rest background. So far a placeholder. And a shitty one at that
 
         my_font = pygame.font.SysFont(None, 36)
         
@@ -1656,9 +1657,9 @@ class node_generation_or_something_idk:
         global shop_prices
 
         vscreen.blit(Images["Shop_Backround.png"], (0, 0))
-        for i, card in enumerate(shop_offers):
+        for i, card in enumerate(shop_offers): 
             if i == 0:
-                game_states.draw_individual_card(330, 830, card)
+                game_states.draw_individual_card(330, 830, card) # The coordinates are kinda eyeballed since the backround is irregular
             elif i == 1:
                 game_states.draw_individual_card(270, 390, card)
             elif i == 2:
@@ -1668,7 +1669,7 @@ class node_generation_or_something_idk:
             elif i == 4:
                 game_states.draw_individual_card(1480, 354, card)
             elif i == 5:
-                game_states.draw_individual_card(1400, 750, card)
+                game_states.draw_individual_card(1419, 795, card) #Had to have the backround redrawn a little since the cards overlapped a little (this one was the trouble maker)
 
     def draw_individual_card(self,x,y,card): # Modified draw_hand for only 1 card, only used in draw_shop since it has iregular placment of purchusable cards (Thanks Adela, no really I think it looks better)
 
@@ -1749,7 +1750,7 @@ class node_generation_or_something_idk:
             elif i == 4:
                 individual_card_clicking_surface = pygame.Rect(1480, 354, *card_dimensions)
             elif i == 5:
-                individual_card_clicking_surface = pygame.Rect(1400, 750, *card_dimensions)
+                individual_card_clicking_surface = pygame.Rect(1419, 795, *card_dimensions)
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if individual_card_clicking_surface.collidepoint(event.pos):
@@ -1996,5 +1997,4 @@ while True:
 
 
 
-
-print("I was *this* close to getting 2k lines of code. This close!")
+print("I was *this* close to getting 2k lines of code. This close!") #Not that having a bloated line count is a good think but I think it's a cool milestone
