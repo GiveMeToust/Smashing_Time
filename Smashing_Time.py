@@ -190,7 +190,7 @@ pygame.display.set_caption("Smashing Time")
 
 clock = pygame.time.Clock()
 
-chance_of_branching = 0.5  # 50% chance to branch sideways in encounter map generation
+chance_of_branching = 0.7  # 50% chance to branch sideways in encounter map generation
 
 encounter_types = ["enemy", "shop", "rest",]
 weights =          [   90,      5,      5, ]  # might scrap events - Actually I did scrap them them, now is later
@@ -323,7 +323,7 @@ explode_move = move("explode", "", 9999, "ATK", 0, tags={}) #that's a suprise to
                                                                 #I think I forgot to actually use this suprise tool, I think I meant to have the barrel use it when it explodes
 floor1_loot = [
     move("Smash", "Smash.jpg", 10, "ATK", 1, tags={}), #
-  #  move("Block", "Block.jpg", 4, "DEF", 0, tags={}), # ---------------------------------- missing texture, messes up the code without it, unfortunatelly we didn't have the time to make the asset
+  #  move("Block", "Block.jpg", 4, "DEF", 0, tags={}), # ---------------------------------- missing texture, messes up the code without it
     move("Power Up", "Power_Up.jpg", 5, "STRup", 1, tags={}), #
     move("Poison Strike", "Poison_Strike.jpg", 7, "ATK", 1, tags={"poison": 3}), ##damages enemy at the end of turn, then loses 1 poison
     move("Poison Bomb", "Poison_Bomb.jpg", 2, "ATK", 2, tags={"poison": 5}), #
@@ -334,7 +334,7 @@ floor1_loot = [
     move("Smite" , "Smite.jpg", 10, "ATK", 1, tags={"blind": 2}), ##makes enemy attacks do 75% damage
     move("Fury" , "Fury.jpg", 6 , "ATK", 1, tags={"multihit": 2}), ##attack twice
     move("Glare", "Glare.jpeg", 5, "ATK", 0, tags={"blind": 1}), #enemy attacks do 75% damage for x turns
-    move("Pray", "Pray.jpg", 5, "DEF", 1, tags={"energised":1, }), #I thought about making it heal but that would promote delaying kills, which is not fun, now it gives you +1 energy next turn
+    move("Pray", "Pray.jpg", 5, "DEF", 1, tags={"energise":1, }), #I thought about making it heal but that would promote delaying kills, which is not fun, now it gives you +1 energy next turn
 ]
 
 
@@ -382,18 +382,14 @@ class player(champion):
         hand = random.sample(Player.pool, k=Player.drawNum)
         
     
-    def resolve_move(self, move):
-        global turn_count
-        
-
-
+    def make_move(self, move):
         if self.Energy < move.cost:
             print("Not enough energy to play this move!")
             return 
         self.Energy -= move.cost
         
-        # Remove the played card from hand immediately
-        hand.remove(move)
+
+        hand.remove(move)# Remove the played card from hand 
         
         multihit = 1
         for tag, tag_value in move.tags.items():
@@ -495,7 +491,7 @@ class player(champion):
             print(f"{self.name} is fucking dead and cannot take more damage!")
             return
 
-        damage_resolved = (self.pending_damage) - (self.block + self.DEF)
+        damage_resolved = (self.pending_damage) - (self.block)
         if damage_resolved < 0:
             damage_resolved = 0
 
@@ -626,13 +622,13 @@ Construct = foe("Construct", 100, 0, 0, Construct_pool, "Construct pool", {}, "C
 Thug = foe("Thug", 80 + random.randint(-5, 5), 5 + random.randint(-1, 1), 0, Thug_pool, "Thug pool", {}, "Thug.png")
 Repair_Man = foe("Repair Man", 200, 0, 0, Repair_Man_pool, "Repair Man pool", {}, "Repair_Man.png")
 Extremely_Sucpicious_Barell = foe("Extremely Sucpicious Barell", 80 + random.randint(-5, 5), 0, 0, Extremely_Sucpicious_Barell_pool, "Extremely Sucpicious Barell pool",  {"explosive": 5}, "Extremely_Sucpicious_Barell.png") #explodes after x turns, gains 2*x block every turn
-Enemy = copy.deepcopy(Joe)
 
 floor1_enemies = [Joe, Construct, Thug, Extremely_Sucpicious_Barell]
 boss_enemies = [Repair_Man]
 
+Enemy = copy.deepcopy(random.choice(floor1_enemies))
 
-
+is_boss_fight = False
 
 
 
@@ -715,6 +711,7 @@ class gameloop:
             game.start_new_card_selection()
             game.end_turn()
             turn_count = 0
+            Player.pending_damage = 0 #Making sure the enemy can't kill the player post mortem.
 
             money_earned = random.randint(1, 10) + (Player.current_node.danger_level * 2)
             Player.money += money_earned
@@ -765,18 +762,21 @@ class gameloop:
 
         if "explosive" in Enemy.status_effects:
             Enemy.status_effects["explosive"] -= 1
-            Enemy.block += Enemy.status_effects["explosive"] * 2
-            print(f"{Enemy.name} gains {Enemy.status_effects['explosive'] * 2} block from being explosive!")
+            Enemy.block += Enemy.status_effects["explosive"]
+            print(f"{Enemy.name} gains {Enemy.status_effects['explosive']} block from being explosive!")
             if Enemy.status_effects["explosive"] <= 0:
                 print(f"{Enemy.name} explodes!")
+                Player.pending_damage += 10
+
                 Enemy.HP = 0
                 game.kill_enemy()
                 del Enemy.status_effects["explosive"]
+                
 
 
 
 
-    def dev_handle_basic_logic(self):
+    def dev_handle_figth_logic(self):
         global game_state
         if event.type == pygame.MOUSEBUTTONDOWN:
             if player_attack_square.collidepoint(event.pos):
@@ -847,7 +847,7 @@ class gameloop:
                 if card_rect.collidepoint(event.pos):
                     print()
                     print(f"Card {card.name} clicked!")
-                    Player.resolve_move(card)
+                    Player.make_move(card)
                     print(f"Played {card}. New hand: {hand}")
                     print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
                     break  # Exit loop after playing one card
@@ -1159,7 +1159,7 @@ class node_generation_or_something_idk:
                 if node is Player.current_node:
                     pygame.draw.circle(vscreen, (255, 215, 0), (x, y), node_radius + 6, 4)
 
-    def draw_hand(self,vscreen, hand, start_x, start_y, end_x): # reused from dev_draw_hand, that's why there is card_width even though I don't set it.
+    def draw_hand(self,screen, hand, start_x, start_y, end_x):
         card_width = 230 #I checked and that is the width of the images once transformed, and since I don't plan to ever change how big the cards will be it's okay to just set it here instead of passing it as a parameter like dev_draw_hand
 
         L = end_x - start_x # total length
@@ -1169,50 +1169,50 @@ class node_generation_or_something_idk:
         for i, card in enumerate(hand):
             my_font = pygame.font.SysFont("Verdana", 36)  # 36 px Verdana
 
-            vscreen.blit(Images[card.image_name],(start_x + i * (card_width + spacing), start_y))  # Draw card image at calculated position
+            screen.blit(Images[card.image_name],(start_x + i * (card_width + spacing), start_y))  # Draw card image at calculated position
 
             move_name_surface = my_font.render(card.name, True, (255, 255, 255))  # White text
-            vscreen.blit(move_name_surface, (4 + start_x + i * (card_width + spacing), start_y - 41))  # Draw move name below the card
+            screen.blit(move_name_surface, (4 + start_x + i * (card_width + spacing), start_y - 41))  # Draw move name below the card
 
 
             my_font = pygame.font.SysFont("Verdana", 38)  # setting it slightly bigger for the outline, only works on single characters because math or something, idk I guess you could do it if you individually rendered each character, but it's not like It's all that important for anything aside from the stuff drawn on the moves themselves
             #Actually, I think it's still offset because pygame renders stuff from the top left corner and not the center, but it still gives it a "shade" if the "outline" isn't too much bigger
 
             move_cost_surface_outline = my_font.render(f"{card.cost}", True, (0, 0, 0))  # black outline
-            vscreen.blit(move_cost_surface_outline, (206 + start_x + i * (card_width + spacing), start_y - 8))  
+            screen.blit(move_cost_surface_outline, (206 + start_x + i * (card_width + spacing), start_y - 8))  
 
             my_font = pygame.font.SysFont("Verdana", 36)  # setting back to normal
 
             move_cost_surface = my_font.render(f"{card.cost}", True, (245, 215, 125))  # tan-yellow text
-            vscreen.blit(move_cost_surface, (206 + start_x + i * (card_width + spacing), start_y - 8))  # Draw move cost below the move name
+            screen.blit(move_cost_surface, (206 + start_x + i * (card_width + spacing), start_y - 8))  # Draw move cost below the move name
 
             move_stats_surface = my_font.render(f"{card.type}-{card.power}", True, (255, 255, 255))  # White text
-            vscreen.blit(move_stats_surface, (4 + start_x + i * (card_width + spacing), start_y + 303))  # Draw move type and power bellow cards
+            screen.blit(move_stats_surface, (4 + start_x + i * (card_width + spacing), start_y + 303))  # Draw move type and power bellow cards
             
             if card.tags:
                 if "multihit" in card.tags:
                     move_tags_surface = my_font.render(f"Multihit: {card.tags['multihit']}", True, (255, 255, 255))  # White text
-                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+                    screen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
                 
                 elif "poison" in card.tags:
                     move_tags_surface = my_font.render(f"Poison: {card.tags['poison']}", True, (255, 255, 255))  # White text
-                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+                    screen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
 
                 elif "draw" in card.tags:
                     move_tags_surface = my_font.render(f"Draw: {card.tags['draw']}", True, (255, 255, 255))  # White text
-                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+                    screen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
                 
                 elif "redraw" in card.tags:
                     move_tags_surface = my_font.render(f"Redraw", True, (255, 255, 255))  # White text
-                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+                    screen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
                
                 elif "energise" in card.tags:
                     move_tags_surface = my_font.render(f"Energise: {card.tags['energise']}", True, (255, 255, 255))  # White text
-                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+                    screen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
 
                 elif "enrage" in card.tags:
                     move_tags_surface = my_font.render(f"Enrage", True, (255, 255, 255))  # White text
-                    vscreen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
+                    screen.blit(move_tags_surface, (4 + start_x + i * (card_width + spacing), start_y + 343))  # Draw move tags below type and power
                 
                 
             
@@ -1229,7 +1229,7 @@ class node_generation_or_something_idk:
         vscreen.blit(Images[Enemy.image_name], (2000, 400))  # Draw enemy image
 
 
-        my_font = pygame.font.SysFont("Verdana", 25)
+        my_font = pygame.font.SysFont("Verdana", 25) #sets up enemy status
         Enemy_status_surface = my_font.render(f"{Enemy.name}) HP:{Enemy.HP}/{Enemy.maxHP} STR:{Enemy.STR} DEF:{Enemy.DEF} Block:{Enemy.block}", True, (255, 255, 255))  # White text
         my_font = pygame.font.SysFont("Verdana", 23)
         Enemy_status_effects_surface = my_font.render(f"Effects: {Enemy.status_effects}", True, (0, 0, 0))  # Black text
@@ -1299,7 +1299,7 @@ class node_generation_or_something_idk:
             Enemy_strenght_label = my_font.render(Enemy_move_strenght, True, (255, 0, 0))  # Red text
 
             if "multihit" in Enemy.enemy_move.tags:
-                Enemy_strenght_label = my_font.render(f"{Enemy_move_strenght} x{Enemy.enemy_move.tags['multihit']}", True, (255, 0, 0))  # Red text with multihit multiplier
+                Enemy_strenght_label = my_font.render(f"{Enemy_move_strenght}x{Enemy.enemy_move.tags['multihit']}", True, (255, 0, 0))  # Red text with multihit multiplier
 
             vscreen.blit(Enemy_strenght_label, (1810 , 710)) 
             vscreen.blit(Images["ATK_Icon.png"], (1810 + Enemy_strenght_label.get_width(), 712)) 
@@ -1370,7 +1370,7 @@ class node_generation_or_something_idk:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if clicking_rect.collidepoint(event.pos):
                     print(f"Clicked on card: {card.name}")
-                    Player.resolve_move(card)
+                    Player.make_move(card)
                     print(f"Played {card}. New hand: {hand}")
                     print(f"Enemy pending_damage: {Enemy.pending_damage}, Player block: {Player.block}")
                     break  # Exit loop after playing one card
@@ -1459,7 +1459,7 @@ class node_generation_or_something_idk:
 
 
     def draw_rest(self):
-        heal_by = Player.maxHP * 0.2
+        heal_by = Player.maxHP * 0.25
         heal_by = round(heal_by)
         if heal_by + Player.HP > Player.maxHP:
             heal_by = Player.maxHP - Player.HP
@@ -1469,7 +1469,7 @@ class node_generation_or_something_idk:
         my_font = pygame.font.SysFont(None, 36)
         
         pygame.draw.rect(vscreen, (5, 222, 5), (500, 500, 400, 100))  # Big green heal button
-        text_surface = my_font.render(f"heal for 20% of max HP({heal_by})", True, (0, 0, 0))  # Black text
+        text_surface = my_font.render(f"heal for 25% of max HP({heal_by})", True, (0, 0, 0))  # Black text
         text_rect = text_surface.get_rect(center=(700, 540))
         vscreen.blit(text_surface, text_rect)
 
@@ -1671,6 +1671,30 @@ class node_generation_or_something_idk:
             elif i == 5:
                 game_states.draw_individual_card(1419, 795, card) #Had to have the backround redrawn a little since the cards overlapped a little (this one was the trouble maker)
 
+        my_font = pygame.font.SysFont("Verdana", 60) # draw a count of your money
+        money_count = my_font.render(f"{Player.money}$", True, (255,255,0))
+        vscreen.blit(money_count, (15, 15)) # Draw Player.money in the top left corner, and this time the fact pygame renders from the left corner actually helps since it as the width grows it just goes more to the right where it's supposed to go
+
+        my_font = pygame.font.SysFont("Verdana", 36)
+        Player_status_box = pygame.Rect(1, 1400, 2560, 50)  # x, y, width, height
+        pygame.draw.rect(vscreen, (128, 128, 128), Player_status_box)  #backround for player status
+
+        my_font = pygame.font.SysFont("Verdana", 30)
+        Player_status_surface = my_font.render(f"{Player.name}) HP:{Player.HP}/{Player.maxHP} STR:{Player.STR} DEF:{Player.DEF} Block:{Player.block} Pending Damage:{Player.pending_damage} Energy:{Player.Energy}/{Player.MaxEnergy} Effects:{Player.status_effects}", True, (255, 255, 255))  # White text
+        vscreen.blit(Player_status_surface, (10, 1403))  # Draw player status
+
+        continue_from_shop = pygame.Rect(1970, 500, 500, 700) #continue squere
+        pygame.draw.rect(vscreen, (130, 130, 200), continue_from_shop)
+
+        my_font = pygame.font.SysFont("Verdana", 60)
+        continue_text = my_font.render("CONTINUE", True, (255, 255, 255))
+        my_font = pygame.font.SysFont("Verdana", 40)
+        continue_subtext = my_font.render("Go out of the shop", True, (255, 255, 255))
+
+        vscreen.blit(continue_text, (1970 + 250 - continue_text.get_width()/2, 750))
+        vscreen.blit(continue_subtext, (1970 + 250 - continue_subtext.get_width()/2, 828))
+
+
     def draw_individual_card(self,x,y,card): # Modified draw_hand for only 1 card, only used in draw_shop since it has iregular placment of purchusable cards (Thanks Adela, no really I think it looks better)
 
         my_font = pygame.font.SysFont("Verdana", 36)  # 36 px Verdana
@@ -1702,8 +1726,7 @@ class node_generation_or_something_idk:
 
         vscreen.blit(card_cost_surface, (x + image.get_width() / 2 - card_cost_surface.get_width() / 2, y + image.get_height() / 2 - card_cost_surface.get_height()/2 )) # the cost of a card in a shop
 
-        my_font = pygame.font.SysFont("Verdana", 36)
-
+        my_font = pygame.font.SysFont("Verdana", 30) #font for tags:
         if card.tags:
             if "multihit" in card.tags:
                 move_tags_surface = my_font.render(f"Multihit: {card.tags['multihit']}", True, (255, 255, 255))  # White text
@@ -1735,6 +1758,7 @@ class node_generation_or_something_idk:
     def handle_shop_logic(self):
         global shop_offers
         global shop_prices
+        global game_state
 
         card_dimensions = 230, 307 #dimensions of a card so I don't have to type it all individually, have to put a * before it to "unpack" it or something 
 
@@ -1762,7 +1786,11 @@ class node_generation_or_something_idk:
                     else:
                         print("not enough money, try again later, sucker")
 
+        continue_from_shop = pygame.Rect(1970, 500, 500, 700)
 
+        if event.type == pygame.MOUSEBUTTONDOWN: #coppying the continue button
+            if continue_from_shop.collidepoint(event.pos):
+                game_state = "map" #prepare map actually sets up a whole new map and it doesn't need any set up
 
 game_states = node_generation_or_something_idk(layer=0, layer_index=0, encounter_type="start")
 
@@ -1947,7 +1975,7 @@ while True:
 
         if game_state == "fight":
             if dev_mode == True:
-                game.dev_handle_basic_logic()
+                game.dev_handle_figth_logic()
             elif dev_mode == False:
                 if Player.alive == False: #disables logic if you are dead
                     pass
@@ -1998,3 +2026,4 @@ while True:
 
 
 print("I was *this* close to getting 2k lines of code. This close!") #Not that having a bloated line count is a good think but I think it's a cool milestone
+#Actually, now I am *that* close without even needing those (checks lines) seven! lines of code, since I made a few revisions since then. Cool milestone, I guess. Still like 500 short to have the longest project out of my friends to a win a bet we had. Oh well.
