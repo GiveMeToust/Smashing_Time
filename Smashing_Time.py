@@ -491,29 +491,24 @@ class player(champion):
             print(f"{self.name} is fucking dead and cannot take more damage!")
             return
 
-        damage_resolved = (self.pending_damage) - (self.block)
-        if damage_resolved < 0:
-            damage_resolved = 0
+        damage_taken = self.pending_damage
 
-        self.HP = self.HP - damage_resolved
+        damage_absorbed_by_block = min(self.block, damage_taken)
 
-        x = (f"{self.name} took {damage_resolved} damage ({self.block} block")
-        self.block = self.block - (self.pending_damage)
-        if self.block > 0:
-            x += f" {self.block} block remaining!)"
-        else:
-            x += ")"
-            self.block = 0
+        self.block -= damage_absorbed_by_block
+        damage_taken -= damage_absorbed_by_block
 
-        print(x)
+        self.HP -= damage_taken
+
         self.pending_damage = 0
-        damage_resolved = 0
-        x = ""
 
         if self.HP <= 0:
-            self.alive = False  
-            print(f"{self.name} has been defeated!") 
-            
+            self.alive = False
+            print("You have been defeated. Game over.")
+
+
+
+
 
     def draw_defeat_screen(self): # tints the screen red and displays "GAME OVER"
         vscreen.blit(death_red_out, (0, 0))  # Reded out background
@@ -613,6 +608,7 @@ class foe(champion):
 
     def get_block(self):
         self.block = self.pending_block
+        self.block = 0
     
 
 
@@ -866,14 +862,14 @@ class gameloop:
         print(f"New turn, {turn_count}")
         turn_count += 1
 
-        Player.block = 0
-        Enemy.block = 0
-
         Player.Energy = Player.MaxEnergy
 
         game.apply_status_effects()
 
         Player.take_damage() 
+
+        Player.block = 0
+        Enemy.block = 0# removes block from previus turn
 
         Enemy.get_block() #from pending block into real block
 
