@@ -608,7 +608,7 @@ class foe(champion):
 
     def get_block(self):
         self.block = self.pending_block
-        self.block = 0
+        self.pending_block = 0
     
 
 
