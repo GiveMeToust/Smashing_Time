@@ -379,7 +379,7 @@ class player(champion):
         global hand
         global Player
         hand.clear()
-        hand = random.sample(Player.pool, k=Player.drawNum)
+        hand = random.sample(list(Player.pool), k=Player.drawNum)
         
     
     def make_move(self, move):
@@ -468,7 +468,7 @@ class player(champion):
                         Enemy.status_effects["poison"] = tag_value # Initial poison application
                     
                 elif tag == "draw":
-                    new_cards = random.sample(self.pool, k=tag_value)
+                    new_cards = random.sample(list(self.pool), k=tag_value)
                     hand.extend(new_cards)
                     print(f"Drew {tag_value} cards: {[card.name for card in new_cards]}")
 
@@ -705,8 +705,6 @@ class gameloop:
             Enemy.alive = False
             print(f"{Enemy.name} has been defeated! A new enemy approaches!")
             game.start_new_card_selection()
-            game.end_turn()
-            turn_count = 0
             Player.pending_damage = 0 #Making sure the enemy can't kill the player post mortem.
 
             money_earned = random.randint(1, 10) + (Player.current_node.danger_level * 2)
@@ -887,7 +885,7 @@ class gameloop:
 
         game_state = "choose_new_card"
 
-        current_choices = random.sample(floor1_loot, 3)
+        current_choices = random.sample(list(floor1_loot), 3)
 
         print("Choose a new card to add to your pool:")
         for i, card in enumerate(current_choices):
@@ -1560,7 +1558,7 @@ class node_generation_or_something_idk:
         global game_state
 
         print("Preparing rest upgrade choices...")
-        rest_upgrade_choices = random.sample(Kori_pool, 3)
+        rest_upgrade_choices = random.sample(list(Kori_pool), 3)
 
         game_state = "rest_upgrade"
 
@@ -1635,7 +1633,7 @@ class node_generation_or_something_idk:
         global game_state
         global shop_prices
 
-        shop_offers = random.sample(floor1_loot, 7) # More than the number displayed in the shop, but as you buy one and remove it from there, the 7th one will get revealed and replace the mising one
+        shop_offers = random.sample(list(floor1_loot), 7) # More than the number displayed in the shop, but as you buy one and remove it from there, the 7th one will get revealed and replace the mising one
         shop_prices = { 0 : 0 }
 
         for card in shop_offers:
@@ -1911,6 +1909,8 @@ end_x= 800
 
 
 enemy_move = Enemy.make_enemy_move()
+
+
 
 #game_states.prepare_shop()
 
